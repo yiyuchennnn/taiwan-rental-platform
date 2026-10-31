@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ========================================
+// 1. 使用者角色
+// ========================================
+
+enum UserRole {
+  RENTER
+  PUBLISHER
+  ADMIN
+}
+
+enum PublisherType {
+  LANDLORD
+  AGENT
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+  ARCHIVED
+}
+
+enum ModerationStatus {
+  NONE
+  SUSPENDED
+  BLOCKED
+}
+
+// ========================================
+// 2. 使用者 User
+// ========================================
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  passwordHash  String?
+  phone         String?
+  role          UserRole       @default(RENTER)
+  publisherType PublisherType?
+  isActive      Boolean        @default(true)
+
+  createdProperties Property[]
+  listings          Listing[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+}
+
+// ========================================
+// 3. 實體房屋 Property
+// ========================================
+
+model Property {
+  id String @id @default(uuid())
+
+  // 房屋所在地區
+  cityCode     String
+  districtCode String
+  addressLine  String
+
+  // 縣市與行政區組合關聯
+  district District @relation(fields: [cityCode, districtCode], references: [cityCode, code])
+
+  // 實際出租單位
+  floor      Int?
+  roomNumber String?
+
+  // 地圖座標
+  latitude  Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
+
+  // 建立資料者，不代表法律所有權人
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  listings Listing[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([cityCode, districtCode])
+}
+
+// ========================================
+// 4. 刊登資料 Listing
+// ========================================
+
+model Listing {
+  id String @id @default(uuid())
+
+  title       String
+  description String?
+  rent        Int
+  deposit     Int?
+
+  status           ListingStatus    @default(DRAFT)
+  moderationStatus ModerationStatus @default(NONE)
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  publisherId String
+  publisher   User   @relation(fields: [publisherId], references: [id])
+
+  media ListingMedia[]
+
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([publisherId])
+  @@index([status, moderationStatus])
+  @@index([rent])
+}
+
+// ========================================
+// 5. 刊登媒體 ListingMedia
+// ========================================
+
+model ListingMedia {
+  id String @id @default(uuid())
+
+  url       String
+  sortOrder Int     @default(0)
+  isCover   Boolean @default(false)
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
+  @@index([listingId, sortOrder])
+}
+
+// ========================================
+// 6. 縣市 City
+// ========================================
+
+model City {
+  code      String  @id
+  name      String  @unique
+  isEnabled Boolean @default(false)
+
+  districts District[]
+}
+
+// ========================================
+// 7. 行政區 District
+// ========================================
+
+model District {
+  code     String
+  name     String
+  cityCode String
+
+  city       City       @relation(fields: [cityCode], references: [code])
+  properties Property[]
+
+  @@id([cityCode, code])
+  @@unique([cityCode, name])
+  @@index([cityCode])
+}
