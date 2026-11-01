@@ -1,0 +1,3 @@
+-- 必須獨立於後續使用新 enum 值的 migration 提交。
+ALTER TYPE "PublisherType" ADD VALUE IF NOT EXISTS 'AUTHORIZED_REPRESENTATIVE';
+ALTER TYPE "ListingStatus" ADD VALUE IF NOT EXISTS 'TRASHED';
