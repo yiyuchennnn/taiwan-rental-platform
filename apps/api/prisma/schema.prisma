@@ -16,6 +16,17 @@ enum UserRole {
   ADMIN
 }
 
+enum PaidPlan {
+  BASIC
+  ADVANCED
+  UNLIMITED
+}
+
+enum EntitlementSource {
+  PURCHASE
+  GIFT
+}
+
 enum PublisherType {
   LANDLORD
   AGENT
@@ -72,11 +83,55 @@ model User {
 
   createdProperties Property[]
   listings          Listing[]
+  sessions          AuthSession[]
+  entitlementAccount EntitlementAccount?
+  entitlementPeriods EntitlementPeriod[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([role])
+}
+
+// Missing/unknown account facts never imply a free downgrade of an existing account.
+model EntitlementAccount {
+  userId     String @id
+  user       User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  verifiedAt DateTime?
+  provenance String
+  createdAt  DateTime @default(now())
+}
+
+// Internal facts, not a payment or gift issuance API. External confirmation writers remain unimplemented.
+model EntitlementPeriod {
+  id              String @id @default(uuid())
+  userId          String
+  user            User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  plan            PaidPlan
+  source          EntitlementSource
+  sourceReference String
+  startsAt        DateTime
+  endsAt          DateTime
+  confirmedAt     DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  @@unique([source, sourceReference])
+  @@index([userId, startsAt, endsAt])
+}
+
+// Opaque bearer tokens are returned once; only SHA-256 digests are retained.
+model AuthSession {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ========================================
@@ -128,6 +183,18 @@ model Listing {
   // 02-06：未定選項先用 nullable 文字，不發明固定選單或預設值。
   rentalType                      String?
   buildingType                    String?
+  buildingDescription             String?
+  depositMode                     String?
+  depositMonths                   Decimal?       @db.Decimal(12, 4)
+  managementFeeMode               String?
+  occupancyMode                   String?
+  floorMode                       String?
+  floorFrom                       Int?
+  floorTo                         Int?
+  balconyMode                     String?
+  sharedSpaces                    String[]       @default([])
+  sharedSpaceDescription          String?
+  equipmentMode                   String?
   areaPings                       Decimal?       @db.Decimal(12, 4)
   areaType                        String?
   bedrooms                        Int?
@@ -197,6 +264,7 @@ model Listing {
   publisher   User   @relation(fields: [publisherId], references: [id])
 
   media ListingMedia[]
+  draftAddress DraftAddress?
 
   // 舊 publishedAt 的歷史語意未確認，保留且不自動回填。
   firstPublishedAt DateTime?
@@ -246,6 +314,7 @@ model City {
   isEnabled Boolean @default(false)
 
   districts District[]
+  draftAddresses DraftAddress[]
 }
 
 // ========================================
@@ -259,10 +328,26 @@ model District {
 
   city       City       @relation(fields: [cityCode], references: [code])
   properties Property[]
+  draftAddresses DraftAddress[]
 
   @@id([cityCode, code])
   @@unique([cityCode, name])
   @@index([cityCode])
+}
+
+// Private per-listing working copy. Never directly changes shared Property or a public address.
+model DraftAddress {
+  listingId     String @id
+  listing       Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  cityCode      String?
+  districtCode  String?
+  addressLine   String?
+  roomNumber    String?
+  communityName String?
+  city          City? @relation(fields: [cityCode], references: [code], onDelete: Restrict)
+  district      District? @relation(fields: [cityCode, districtCode], references: [cityCode, code], onDelete: Restrict)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // 02-09：僅保存處理後展示圖／縮圖，不存長期原圖；不預設任何方案 GB。
@@ -276,4 +361,25 @@ model MediaAsset {
   gpsRemovedAt   DateTime?
   createdAt      DateTime       @default(now())
   listingMedia   ListingMedia[]
+}
+
+// Durable storage ownership and recovery record. Snapshot IDs intentionally survive
+// listing/user removal so an orphaned private object can still be reconciled.
+model MediaUpload {
+  id String @id
+  ownerId String
+  requestKey String
+  inputDigest String
+  listingId String
+  nonce String
+  namespace String
+  state String
+  reservedBytes BigInt
+  leaseUntil DateTime
+  rightsConfirmedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([listingId, state])
+  @@unique([ownerId, requestKey])
+  @@index([state, leaseUntil])
 }

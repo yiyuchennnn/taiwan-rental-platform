@@ -1,0 +1,83 @@
+{
+  "sourceKind": "synthetic-test-fixtures",
+  "provisional": true,
+  "profile": {
+    "maxInputBytes": 10000000,
+    "displayMaxEdge": 1920,
+    "thumbnailMaxEdge": 480,
+    "quality": 82,
+    "maxInputPixels": 40000000,
+    "timeoutSeconds": 15
+  },
+  "comparedDisplayEdges": [
+    1920,
+    2560
+  ],
+  "measurements": [
+    {
+      "name": "bright-gradients",
+      "inputBytes": 816022,
+      "edge": 1920,
+      "width": 1920,
+      "height": 1440,
+      "displayBytes": 25798,
+      "thumbnailBytes": 4062,
+      "totalBytes": 29860
+    },
+    {
+      "name": "bright-gradients",
+      "inputBytes": 816022,
+      "edge": 2560,
+      "width": 2560,
+      "height": 1920,
+      "displayBytes": 39498,
+      "thumbnailBytes": 4062,
+      "totalBytes": 43560
+    },
+    {
+      "name": "fine-details",
+      "inputBytes": 2718254,
+      "edge": 1920,
+      "width": 1920,
+      "height": 1440,
+      "displayBytes": 196750,
+      "thumbnailBytes": 3200,
+      "totalBytes": 199950
+    },
+    {
+      "name": "fine-details",
+      "inputBytes": 2718254,
+      "edge": 2560,
+      "width": 2560,
+      "height": 1920,
+      "displayBytes": 644720,
+      "thumbnailBytes": 3200,
+      "totalBytes": 647920
+    },
+    {
+      "name": "dark-noise",
+      "inputBytes": 3822947,
+      "edge": 1920,
+      "width": 1920,
+      "height": 1440,
+      "displayBytes": 642762,
+      "thumbnailBytes": 4192,
+      "totalBytes": 646954
+    },
+    {
+      "name": "dark-noise",
+      "inputBytes": 3822947,
+      "edge": 2560,
+      "width": 2560,
+      "height": 1920,
+      "displayBytes": 1474094,
+      "thumbnailBytes": 4192,
+      "totalBytes": 1478286
+    }
+  ],
+  "limitations": [
+    "Synthetic fixtures cannot establish real photograph quality or average storage cost",
+    "No plan GB limit is selected",
+    "Only processed display and thumbnail bytes are counted; no original is retained by the upload pipeline"
+  ]
+}

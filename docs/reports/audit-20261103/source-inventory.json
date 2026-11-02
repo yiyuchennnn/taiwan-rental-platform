@@ -1,0 +1,171 @@
+{
+  "method": "static import-path scan, confirmed separately by typecheck/build",
+  "sourceFiles": 34,
+  "runtimeImportCycles": [],
+  "runtimeExternalModules": [
+    "@aws-sdk/client-s3",
+    "@aws-sdk/s3-request-presigner",
+    "@prisma/adapter-pg",
+    "@prisma/client",
+    "@smithy/node-http-handler",
+    "argon2",
+    "cors",
+    "express",
+    "helmet",
+    "https-proxy-agent",
+    "node:crypto",
+    "node:fs/promises",
+    "node:os",
+    "node:path",
+    "sharp",
+    "zod"
+  ],
+  "notReachableFromServer": [
+    "apps/api/src/modules/auth/auth.routes.ts",
+    "apps/api/src/modules/listings/listing-options.ts",
+    "apps/api/src/modules/listings/publication-check.ts",
+    "apps/api/src/modules/listings/publication-details-storage.ts",
+    "apps/api/src/modules/listings/publication-details.ts",
+    "apps/api/src/modules/listings/require-listing-owner.ts",
+    "apps/api/src/modules/media/process-and-store.ts",
+    "apps/api/src/modules/media/storage-capacity.ts"
+  ],
+  "allSourceFiles": [
+    {
+      "path": "apps/api/src/app-factory.ts",
+      "lines": 41
+    },
+    {
+      "path": "apps/api/src/app.ts",
+      "lines": 5
+    },
+    {
+      "path": "apps/api/src/lib/prisma.ts",
+      "lines": 18
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.controller.ts",
+      "lines": 45
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.router-factory.ts",
+      "lines": 17
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.routes.ts",
+      "lines": 4
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.schema.ts",
+      "lines": 42
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.service.ts",
+      "lines": 122
+    },
+    {
+      "path": "apps/api/src/modules/auth/require-auth.ts",
+      "lines": 18
+    },
+    {
+      "path": "apps/api/src/modules/auth/session.service.ts",
+      "lines": 52
+    },
+    {
+      "path": "apps/api/src/modules/entitlements/entitlement.service.ts",
+      "lines": 24
+    },
+    {
+      "path": "apps/api/src/modules/entitlements/plan-catalog.ts",
+      "lines": 8
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft-address.ts",
+      "lines": 48
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft-creation-policy.ts",
+      "lines": 19
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft.routes.ts",
+      "lines": 34
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft.schema.ts",
+      "lines": 40
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft.service.ts",
+      "lines": 169
+    },
+    {
+      "path": "apps/api/src/modules/listings/listing-options.ts",
+      "lines": 25
+    },
+    {
+      "path": "apps/api/src/modules/listings/publication-check.ts",
+      "lines": 87
+    },
+    {
+      "path": "apps/api/src/modules/listings/publication-details-storage.ts",
+      "lines": 57
+    },
+    {
+      "path": "apps/api/src/modules/listings/publication-details.ts",
+      "lines": 112
+    },
+    {
+      "path": "apps/api/src/modules/listings/require-listing-owner.ts",
+      "lines": 22
+    },
+    {
+      "path": "apps/api/src/modules/listings/storage-numbers.ts",
+      "lines": 7
+    },
+    {
+      "path": "apps/api/src/modules/media/draft-media.routes.ts",
+      "lines": 60
+    },
+    {
+      "path": "apps/api/src/modules/media/draft-media.service.ts",
+      "lines": 190
+    },
+    {
+      "path": "apps/api/src/modules/media/image-profile.ts",
+      "lines": 14
+    },
+    {
+      "path": "apps/api/src/modules/media/media-runtime.ts",
+      "lines": 28
+    },
+    {
+      "path": "apps/api/src/modules/media/private-image-store.ts",
+      "lines": 42
+    },
+    {
+      "path": "apps/api/src/modules/media/process-and-store.ts",
+      "lines": 37
+    },
+    {
+      "path": "apps/api/src/modules/media/process-image.ts",
+      "lines": 87
+    },
+    {
+      "path": "apps/api/src/modules/media/r2-config.ts",
+      "lines": 35
+    },
+    {
+      "path": "apps/api/src/modules/media/r2-image-store.ts",
+      "lines": 103
+    },
+    {
+      "path": "apps/api/src/modules/media/storage-capacity.ts",
+      "lines": 21
+    },
+    {
+      "path": "apps/api/src/server.ts",
+      "lines": 15
+    }
+  ]
+}

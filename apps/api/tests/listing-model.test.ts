@@ -7,6 +7,7 @@ import { Client } from "pg";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { publicationDetailsToStorage, publicationDetailsFromStorage } from "../src/modules/listings/publication-details-storage.js";
 
 // Always create our own database cluster. Never read DATABASE_URL or project .env.
 // Requires initdb / pg_ctl on PATH; missing binaries fail rather than skip tests.
@@ -38,7 +39,7 @@ beforeAll(async () => {
   started = true;
   db = new Client({ host: root, database: "postgres", user: "postgres", port: 5432 });
   await db.connect();
-  for (const dir of readdirSync(migrations).filter(x => /^\d/.test(x) && x !== alignment).sort()) {
+  for (const dir of readdirSync(migrations).filter(x => /^\d/.test(x) && x < alignment).sort()) {
     await db.query(sql(dir));
   }
   // Fixtures represent existing data at the CURRENT schema, not at an old abandoned schema.
@@ -53,6 +54,7 @@ beforeAll(async () => {
     INSERT INTO "ListingMedia" (id, url, "listingId", "isCover") VALUES ('old-photo', 'https://example.test/old.jpg', 'legacy', true);
   `);
   await db.query(sql(alignment));
+  for (const dir of readdirSync(migrations).filter(x => /^\d/.test(x) && x > alignment).sort()) await db.query(sql(dir));
   upgraded = true;
 }, 30000);
 
@@ -194,7 +196,7 @@ test("invalid existing duplicate covers stop migration without partial data/sche
   const isolated = new Client({ host: root, database: "duplicate_cover_test", user: "postgres", port: 5432 });
   await isolated.connect();
   try {
-    for (const dir of readdirSync(migrations).filter(x => /^\d/.test(x) && x !== alignment).sort()) await isolated.query(sql(dir));
+    for (const dir of readdirSync(migrations).filter(x => /^\d/.test(x) && x < alignment).sort()) await isolated.query(sql(dir));
     await isolated.query(`
       INSERT INTO "User" (id, email, "updatedAt") VALUES ('owner', 'owner@example.test', NOW());
       INSERT INTO "City" (code, name) VALUES ('66', '臺中市');
@@ -209,4 +211,81 @@ test("invalid existing duplicate covers stop migration without partial data/sche
     expect((await isolated.query(`SELECT is_nullable FROM information_schema.columns WHERE table_name='Listing' AND column_name='title'`)).rows[0].is_nullable).toBe("NO");
     expect((await isolated.query(`SELECT to_regclass('"MediaAsset"') AS name`)).rows[0].name).toBeNull();
   } finally { await isolated.end(); }
+});
+
+
+test("new input modes preserve legacy unknowns, amounts and location without inference", async () => {
+  const orm = new PrismaClient({ adapter: new PrismaPg({ host: root, database: "postgres", user: "postgres", port: 5432 }) });
+  try {
+    const legacy = await orm.listing.findUniqueOrThrow({ where: { id: "legacy" } });
+    expect(legacy.depositMode).toBeNull();
+    expect(legacy.floorMode).toBeNull();
+    expect(legacy.occupancyMode).toBeNull();
+    expect(legacy.rent).toBe(12000);
+    expect(publicationDetailsFromStorage(legacy).complete).toBe(false);
+  } finally { await orm.$disconnect(); }
+});
+
+test("structured listing section round trips and changing modes clears stale dependent values", async () => {
+  const orm = new PrismaClient({ adapter: new PrismaPg({ host: root, database: "postgres", user: "postgres", port: 5432 }) });
+  const input = { rentalType: "SUITE", buildingType: "TOWNHOUSE", hasElevator: false,
+    deposit: { mode: "MONTHS", months: 1.5 }, managementFee: { mode: "SEPARATE", amount: 500 },
+    occupancy: { mode: "DATE", date: "2026-12-01" }, minimumLeaseTerm: "兩週", equipment: { mode: "PRESENT", furniture: ["書桌"], appliances: [] },
+    floor: { mode: "RANGE", from: -1, to: 1 }, totalFloors: 4, privateBathrooms: 1, balcony: { mode: "PRIVATE", count: 1 }, sharedSpaces: ["KITCHEN"] };
+  try {
+    const draft = await orm.listing.create({ data: { publisherId: "owner", areaType: "legacy-area-type" } });
+    const row = await orm.listing.update({ where: { id: draft.id }, data: publicationDetailsToStorage(input) });
+    expect(publicationDetailsFromStorage(row)).toMatchObject({ complete: true, value: input });
+    expect(row.deposit).toBeNull();
+    expect(row.depositMonths?.toString()).toBe("1.5");
+    expect(row.areaType).toBe("legacy-area-type");
+    expect(row.status).toBe("DRAFT");
+    const updated = await orm.listing.update({ where: { id: draft.id }, data: publicationDetailsToStorage({ ...input,
+      deposit: { mode: "NONE" }, managementFee: { mode: "INCLUDED" }, occupancy: { mode: "IMMEDIATE" },
+      equipment: { mode: "NONE" }, floor: { mode: "SINGLE", level: 2 }, balcony: { mode: "NONE" } }) });
+    expect(updated.deposit).toBe(0);
+    expect(updated.depositMonths).toBeNull();
+    expect(updated.managementFee).toBeNull();
+    expect(updated.availableFrom).toBeNull();
+    expect(updated.floorTo).toBeNull();
+    expect(updated.furniture).toEqual([]);
+    expect(updated.balconies).toBe(0);
+    expect(publicationDetailsFromStorage(updated).complete).toBe(true);
+    expect(() => publicationDetailsToStorage({ ...input, status: "PUBLISHED" })).toThrow();
+  } finally { await orm.$disconnect(); }
+});
+
+test("mode constraints reject invalid values while incomplete drafts remain allowed", async () => {
+  await reject(`UPDATE "Listing" SET "depositMode"='UNKNOWN' WHERE id='legacy'`, [], "23514");
+  await reject(`UPDATE "Listing" SET "depositMonths"=0 WHERE id='legacy'`, [], "23514");
+  await reject(`UPDATE "Listing" SET "floorMode"='RANGE', "floorFrom"=4, "floorTo"=2 WHERE id='legacy'`, [], "23514");
+  await reject(`UPDATE "Listing" SET "sharedSpaces"=ARRAY['INVALID'] WHERE id='legacy'`, [], "23514");
+});
+
+test("accepted numeric boundaries round trip unchanged and rejected precision never alters a draft", async () => {
+  const orm = new PrismaClient({ adapter: new PrismaPg({ host: root, database: "postgres", user: "postgres", port: 5432 }) });
+  const section = { rentalType: "SUITE", buildingType: "TOWNHOUSE", hasElevator: false,
+    deposit: { mode: "MONTHS", months: 2 }, managementFee: { mode: "SEPARATE", amount: 2147483647 },
+    occupancy: { mode: "IMMEDIATE" }, minimumLeaseTerm: "兩週", equipment: { mode: "NONE" },
+    floor: { mode: "SINGLE", level: -1 }, totalFloors: 4, privateBathrooms: 1, balcony: { mode: "NONE" } };
+  try {
+    const draft = await orm.listing.create({ data: { publisherId: "owner", title: "numeric regression" } });
+    for (const months of [0.0001, 1.2345, 99999999.9999]) {
+      const saved = await orm.listing.update({ where: { id: draft.id },
+        data: publicationDetailsToStorage({ ...section, deposit: { mode: "MONTHS", months } }) });
+      expect(saved.depositMonths?.toString()).toBe(String(months));
+      expect(publicationDetailsFromStorage(saved)).toMatchObject({ complete: true, value: { deposit: { mode: "MONTHS", months } } });
+      expect(saved.managementFee).toBe(2147483647);
+    }
+    for (const area of ["0.0001", "99999999.9999"]) {
+      const saved = await orm.listing.update({ where: { id: draft.id }, data: { areaPings: new Prisma.Decimal(area) } });
+      expect(saved.areaPings?.toString()).toBe(area);
+    }
+    const before = await orm.listing.findUniqueOrThrow({ where: { id: draft.id } });
+    for (const months of [0.00001, 1.23456, 100000000]) {
+      expect(() => publicationDetailsToStorage({ ...section, deposit: { mode: "MONTHS", months } })).toThrow();
+    }
+    const after = await orm.listing.findUniqueOrThrow({ where: { id: draft.id } });
+    expect(after).toEqual(before);
+  } finally { await orm.$disconnect(); }
 });
