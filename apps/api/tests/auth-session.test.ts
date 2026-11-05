@@ -57,8 +57,8 @@ beforeAll(async () => {
   app.use("/api/v1/drafts", createDraftRouter(orm));
   // Explicit test-only policy fixtures. Never wire these into the production app.
   app.use("/test/drafts", createDraftRouter(orm, async () => ({ draftLimit: 1, archiveCreation: "ALLOWED" })));
-  app.use("/test/blocked-drafts", createDraftRouter(orm, async () => ({ draftLimit: 1, archiveCreation: "BLOCKED" })));
-  app.use("/test/unresolved-drafts", createDraftRouter(orm, async () => ({ draftLimit: 1, archiveCreation: "UNRESOLVED" })));
+  app.use("/test/blocked-drafts", createDraftRouter(orm, async () => ({ draftLimit: -1 })));
+  app.use("/test/unresolved-drafts", createDraftRouter(orm, async () => ({ draftLimit: Number.NaN })));
   // Test-only integration route exercises the actual middleware, not a shipped API.
   app.get("/test/listings/:id", requireAuth(createSessionService(orm, 3600)), requireListingOwner(orm), (_req, res) => res.json({ id: res.locals.listingId }));
   ownerId = (await request(app).post("/api/v1/auth/register").send({ email: "owner@example.test", password, role: "ADMIN" }).expect(201)).body.data.user.id;
@@ -180,9 +180,9 @@ test("concurrent creation cannot consume the last quota twice", async () => {
   expect(results.map(result => result.status).sort()).toEqual([201, 409]);
   expect(await orm.listing.count({ where: { publisherId: user.id } })).toBe(1);
 });
-test("archive decision unresolved or blocked cannot silently allow creation", async () => {
+test("invalid trusted quota facts cannot silently allow creation", async () => {
   const { token, user } = await draftIdentity();
-  await request(app).post("/test/blocked-drafts").set("Authorization", `Bearer ${token}`).send({}).expect(409);
+  await request(app).post("/test/blocked-drafts").set("Authorization", `Bearer ${token}`).send({}).expect(503);
   await request(app).post("/test/unresolved-drafts").set("Authorization", `Bearer ${token}`).send({}).expect(503);
   expect(await orm.listing.count({ where: { publisherId: user.id } })).toBe(0);
 });
@@ -302,7 +302,7 @@ test("changing floor or balcony mode does not invent new answers from the previo
 
 test("registered accounts have a server-recorded free baseline, legacy missing records stay unknown", async () => {
   const free = await resolveCurrentEntitlement(orm, ownerId);
-  expect(free).toMatchObject({ status: "READY", plan: "FREE", quotas: { draftListings: 1 } });
+  expect(free).toMatchObject({ status: "READY", plan: "FREE", quotas: { draftListings: 3 } });
   const { user } = await draftIdentity();
   expect(await resolveCurrentEntitlement(orm, user.id)).toMatchObject({ status: "UNAVAILABLE", reason: "ACCOUNT_NOT_RECONCILED" });
 });
@@ -316,7 +316,7 @@ const evaluation = new Date("2026-11-02T12:00:00.000Z");
 const periodFixture = (userId: string) => ({ userId, plan: "BASIC" as const, source: "PURCHASE" as const, sourceReference: randomUUID(),
   startsAt: new Date("2026-11-01"), endsAt: new Date("2026-12-01"), confirmedAt: new Date("2026-11-01") });
 
-test.each(["BASIC", "ADVANCED", "UNLIMITED"] as const)("confirmed %s facts resolve the exact published quotas", async plan => {
+test.each(["BASIC", "ADVANCED", "FLAGSHIP"] as const)("confirmed %s facts resolve the exact published quotas", async plan => {
   const userId = await entitlementFixture();
   await orm.entitlementPeriod.create({ data: { ...periodFixture(userId), plan } });
   expect(await resolveCurrentEntitlement(orm, userId, evaluation)).toEqual({ status: "READY", plan, quotas: planCatalog[plan].quotas });
@@ -355,12 +355,12 @@ test("revoking one fact preserves another valid source and duplicate evidence ca
   await orm.entitlementPeriod.update({ where: { id: record.id }, data: { revokedAt: evaluation } });
   expect(await resolveCurrentEntitlement(orm, userId, evaluation)).toMatchObject({ status: "READY", plan: "BASIC" });
 });
-test("plan catalog preserves confirmed prices, separate quotas and unlimited public listings only", () => {
+test("plan catalog preserves confirmed prices, separate quotas and finite flagship public listings", () => {
   expect(Object.values(planCatalog).map(plan => plan.price)).toEqual([
-    { monthly: 0, quarterly: null, yearly: null }, { monthly: 299, quarterly: 718, yearly: 2512 },
-    { monthly: 499, quarterly: 1198, yearly: 4192 }, { monthly: 749, quarterly: 1798, yearly: 6292 },
+    { monthly: 0, quarterly: null, yearly: null }, { monthly: 199, quarterly: null, yearly: null },
+    { monthly: 399, quarterly: null, yearly: null }, { monthly: 749, quarterly: 1798, yearly: 6292 },
   ]);
-  expect(planCatalog.UNLIMITED.quotas).toEqual({ publicListings: null, draftListings: 300, archivedListings: 1000, publicArticles: 100, draftArticles: 100, archivedArticles: 300 });
+  expect(planCatalog.FLAGSHIP.quotas).toEqual({ publicListings: 300, draftListings: 300, archivedListings: 1000, publicArticles: 100, draftArticles: 100, archivedArticles: 300 });
 });
 
 async function readyDraftIdentity() {
@@ -374,36 +374,30 @@ test("production draft route uses a trusted free baseline, not a test quota call
   const email = response.body.data.user.email;
   const token = (await request(app).post("/api/v1/auth/login").send({ email, password }).expect(200)).body.data.accessToken;
   await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({}).expect(201);
+  await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({}).expect(201);
+  await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({}).expect(201);
   const full = await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({}).expect(409);
   expect(full.body.error.code).toBe("DRAFT_QUOTA_EXCEEDED");
 });
-test.each([9, 10, 11])("C01 free archive count %i checks overflow rather than equality", async count => {
+test.each([9, 10, 11])("C01 archive count %i does not consume draft slots", async count => {
   const { token, user } = await readyDraftIdentity();
-  await orm.listing.createMany({ data: Array.from({ length: count }, () => ({ publisherId: user.id, status: "ARCHIVED" as const, archiveReason: "MANUAL" as const })) });
-  const result = await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({});
-  expect(result.status).toBe(count > 10 ? 409 : 201);
-  if (count > 10) {
-    expect(result.body.error.code).toBe("ARCHIVE_OVERFLOW");
-    expect(await orm.listing.count({ where: { publisherId: user.id, status: "DRAFT" } })).toBe(0);
-  }
+  await orm.listing.createMany({ data: Array.from({ length: count }, () => ({ publisherId: user.id, status: "ARCHIVED" as const })) });
+  await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({}).expect(201);
+  expect(await orm.listing.count({ where: { publisherId: user.id, status: "ARCHIVED" } })).toBe(count);
 });
-test("C01 rejects new drafts but does not prevent editing existing drafts or delete content", async () => {
+test("C01 archive overflow preserves existing drafts and allows another available draft slot", async () => {
   const { token, user } = await readyDraftIdentity();
   await orm.listing.createMany({ data: Array.from({ length: 11 }, () => ({ publisherId: user.id, status: "ARCHIVED" as const })) });
   const draft = await orm.listing.create({ data: { publisherId: user.id, title: "retain" } });
-  await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({}).expect(409);
-  await request(app).get(`/api/v1/drafts/${draft.id}`).set("Authorization", `Bearer ${token}`).expect(200);
-  await request(app).patch(`/api/v1/drafts/${draft.id}`).set("Authorization", `Bearer ${token}`).send({ title: "editable" }).expect(200);
-  expect(await orm.listing.count({ where: { publisherId: user.id } })).toBe(12);
-});
-test("trash is separate from archive quota and legacy UNPUBLISHED is not guessed", async () => {
-  const { token, user } = await readyDraftIdentity();
-  await orm.listing.createMany({ data: Array.from({ length: 11 }, () => ({ publisherId: user.id, status: "TRASHED" as const, trashedAt: new Date() })) });
   await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({}).expect(201);
-  const other = await readyDraftIdentity();
-  await orm.listing.create({ data: { publisherId: other.user.id, status: "UNPUBLISHED" } });
-  const result = await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${other.token}`).send({}).expect(503);
-  expect(result.body.error.code).toBe("LEGACY_LISTING_STATE_UNRESOLVED");
+  await request(app).patch(`/api/v1/drafts/${draft.id}`).set("Authorization", `Bearer ${token}`).send({ title: "editable" }).expect(200);
+  expect(await orm.listing.count({ where: { publisherId: user.id } })).toBe(13);
+});
+test("historical unpublished content is preserved without consuming draft slots", async () => {
+  const { token, user } = await readyDraftIdentity();
+  const legacy = await orm.listing.create({ data: { publisherId: user.id, status: "UNPUBLISHED" } });
+  await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({}).expect(201);
+  expect(await orm.listing.findUniqueOrThrow({ where: { id: legacy.id } })).toEqual(legacy);
 });
 test("trusted BASIC facts determine draft limit without adding gift quotas", async () => {
   const { token, user } = await readyDraftIdentity();
@@ -416,10 +410,11 @@ test("trusted BASIC facts determine draft limit without adding gift quotas", asy
 });
 test("concurrent creation through actual entitlement policy cannot overshoot the last free slot", async () => {
   const { token, user } = await readyDraftIdentity();
+  await orm.listing.createMany({ data: [{ publisherId: user.id }, { publisherId: user.id }] });
   const create = () => request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({});
   const responses = await Promise.all([create(), create()]);
   expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
-  expect(await orm.listing.count({ where: { publisherId: user.id, status: "DRAFT" } })).toBe(1);
+  expect(await orm.listing.count({ where: { publisherId: user.id, status: "DRAFT" } })).toBe(3);
 });
 
 test("address can be saved incompletely and never creates a fake shared property", async () => {

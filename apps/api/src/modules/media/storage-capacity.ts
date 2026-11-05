@@ -19,3 +19,17 @@ export function assessStorageCapacity(facts: StorageCapacityFacts) {
   return { state: "KNOWN" as const, allowed, warning: limitBytes > 0n && projected * 100n >= limitBytes * 80n,
     full, allocatedBytes: allocated, projectedBytes: projected, remainingBytes: allocated < limitBytes ? limitBytes - allocated : 0n };
 }
+
+/** Settlement arithmetic only. Not authorization to replace, transfer or delete.
+ * Callers must persist U0 before the operation and serialize ledger mutations.
+ * D excludes estimated, pending, failed and still-referenced deletions.
+ */
+export function settledUsageFromBaseline(input: {
+  baselineUsedBytes: bigint;
+  confirmedDeletedBytes: bigint;
+  formalAddedBytes: bigint;
+}): bigint {
+  const { baselineUsedBytes: u0, confirmedDeletedBytes: d, formalAddedBytes: n } = input;
+  if (u0 < 0n || d < 0n || n < 0n || d > u0) throw new Error("Invalid storage settlement facts");
+  return u0 - d + n;
+}

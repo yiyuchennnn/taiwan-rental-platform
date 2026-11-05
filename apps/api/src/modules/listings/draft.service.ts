@@ -10,7 +10,7 @@ export class DraftError extends Error {
 
 // Trusted server-side dependency, never request input. C01 must be explicitly resolved by the provider.
 export type DraftCreationPolicy = (tx: Prisma.TransactionClient, userId: string) => Promise<{
-  draftLimit: number; archiveCreation: "ALLOWED" | "BLOCKED" | "UNRESOLVED";
+  draftLimit: number;
 }>;
 export const unavailableDraftPolicy: DraftCreationPolicy = async () => {
   throw new DraftError(503, "DRAFT_ENTITLEMENTS_UNAVAILABLE", "草稿新增資格尚未接妥，請稍後再試");
@@ -155,9 +155,7 @@ export function createDraftService(db: PrismaClient, creationPolicy: DraftCreati
       return db.$transaction(async tx => {
         await authenticated(tx, auth);
         const policy = await creationPolicy(tx, auth.user.id);
-        if (!Number.isSafeInteger(policy.draftLimit) || policy.draftLimit < 0
-          || !["ALLOWED", "BLOCKED"].includes(policy.archiveCreation)) throw new DraftError(503, "DRAFT_ENTITLEMENTS_UNAVAILABLE", "草稿新增資格尚未接妥");
-        if (policy.archiveCreation === "BLOCKED") throw new DraftError(409, "ARCHIVE_OVERFLOW", "封存限制尚未解除，暫停新增草稿");
+        if (!Number.isSafeInteger(policy.draftLimit) || policy.draftLimit < 0) throw new DraftError(503, "DRAFT_ENTITLEMENTS_UNAVAILABLE", "草稿新增資格尚未接妥");
         const drafts = await tx.listing.count({ where: { publisherId: auth.user.id, status: "DRAFT" } });
         if (drafts >= policy.draftLimit) throw new DraftError(409, "DRAFT_QUOTA_EXCEEDED", "草稿額度已滿，原有內容仍保留");
         const row = await tx.listing.create({ data: { ...data, publisherId: auth.user.id, status: "DRAFT" } as Prisma.ListingUncheckedCreateInput });

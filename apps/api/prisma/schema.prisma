@@ -19,7 +19,7 @@ enum UserRole {
 enum PaidPlan {
   BASIC
   ADVANCED
-  UNLIMITED
+  FLAGSHIP
 }
 
 enum EntitlementSource {
@@ -177,6 +177,28 @@ model Property {
 
 model Listing {
   id String @id @default(uuid())
+
+  areaSource String?
+  elevatorStatus String?
+  petPolicy String?
+  cookingPolicy String?
+  laundryStatus String?
+  dryingStatus String?
+  garbageStatus String?
+  subsidyPolicy String?
+  minimumLeaseMonths Int?
+  floors Int[] @default([])
+  carParkingStatus String?
+  motorcycleParkingStatus String?
+  carParkingRequired Boolean?
+  motorcycleParkingRequired Boolean?
+  carParkingFrequency String?
+  motorcycleParkingFrequency String?
+  contactExtension String?
+  authorizationDescription String?
+  utilityCharges ListingUtilityCharge[]
+  equipmentItems ListingEquipmentItem[]
+  feeItems ListingFeeItem[]
 
   title                           String?
   description                     String?
@@ -344,6 +366,9 @@ model DraftAddress {
   addressLine   String?
   roomNumber    String?
   communityName String?
+  buildingNumber String?
+  roomIdentifierSource String?
+  addressKind String?
   city          City? @relation(fields: [cityCode], references: [code], onDelete: Restrict)
   district      District? @relation(fields: [cityCode, districtCode], references: [cityCode, code], onDelete: Restrict)
   createdAt     DateTime @default(now())
@@ -382,4 +407,40 @@ model MediaUpload {
   @@index([listingId, state])
   @@unique([ownerId, requestKey])
   @@index([state, leaseUntil])
+}
+
+// New R02 data is explicit. Legacy free-text/scalar fields are retained, never guessed.
+model ListingUtilityCharge {
+  listingId String
+  kind String
+  listing Listing @relation(fields:[listingId], references:[id], onDelete:Cascade)
+  mode String
+  amount Int?
+  rate Decimal? @db.Decimal(12,2)
+  unit String?
+  frequency String?
+  source String?
+  description String?
+  variableRate Boolean @default(false)
+  @@id([listingId,kind])
+}
+model ListingEquipmentItem {
+  listingId String
+  code String
+  listing Listing @relation(fields:[listingId], references:[id], onDelete:Cascade)
+  status String
+  @@id([listingId,code])
+}
+model ListingFeeItem {
+  id String @id @default(uuid())
+  listingId String
+  listing Listing @relation(fields:[listingId], references:[id], onDelete:Cascade)
+  kind String
+  label String
+  mode String
+  amount Int?
+  frequency String?
+  required Boolean
+  description String?
+  @@index([listingId])
 }
