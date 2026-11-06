@@ -186,12 +186,12 @@ test("invalid trusted quota facts cannot silently allow creation", async () => {
   await request(app).post("/test/unresolved-drafts").set("Authorization", `Bearer ${token}`).send({}).expect(503);
   expect(await orm.listing.count({ where: { publisherId: user.id } })).toBe(0);
 });
-test("PATCH preserves omitted fields, zero/false, and allows explicit null without forcing completeness", async () => {
+test("PATCH preserves omitted fields, false and explicit null without forcing completeness", async () => {
   const { token, user } = await draftIdentity();
   const row = await orm.listing.create({ data: { publisherId: user.id, title: "retain", description: "old", rent: 12000, areaType: "legacy" } });
   const response = await request(app).patch(`/api/v1/drafts/${row.id}`).set("Authorization", `Bearer ${token}`)
-    .send({ description: null, rent: 0, hasElevator: false }).expect(200);
-  expect(response.body.data.draft).toMatchObject({ title: "retain", description: null, rent: 0, hasElevator: false });
+    .send({ description: null, rent: 1, hasElevator: false }).expect(200);
+  expect(response.body.data.draft).toMatchObject({ title: "retain", description: null, rent: 1, hasElevator: false });
   expect(response.body.data.draft.areaType).toBe("legacy");
   expect((await orm.listing.findUniqueOrThrow({ where: { id: row.id } })).areaType).toBe("legacy");
   await request(app).get(`/api/v1/drafts/${row.id}`).set("Authorization", `Bearer ${token}`).expect(200);
@@ -492,4 +492,120 @@ test("concurrent address patches preserve different fields in the working copy",
   ]);
   expect(results.map(response => response.status)).toEqual([200, 200]);
   expect(await orm.draftAddress.findUniqueOrThrow({ where: { listingId: row.id } })).toMatchObject({ addressLine: "測試路", roomNumber: "A" });
+});
+
+
+test("current listing fields and child collections survive POST, GET and unrelated PATCH", async () => {
+  const { token, user } = await readyDraftIdentity();
+  const payload = { title: "  新房源  ", rentalType: "INDEPENDENT_SUITE", buildingType: "MID_RISE",
+    areaPings: 12.34, areaSource: "ESTIMATED", floorMode: "MULTIPLE", floors: [-1, 2], totalFloors: 4,
+    elevatorStatus: "UNKNOWN", petPolicy: "DISCUSS", cookingPolicy: "NOT_ALLOWED", laundryStatus: "SHARED",
+    dryingStatus: "PRIVATE", garbageStatus: "SELF", subsidyPolicy: "UNKNOWN", minimumLeaseMonths: 12,
+    carParkingStatus: "YES", carParkingRequired: false, carParkingFrequency: "MONTHLY",
+    motorcycleParkingStatus: "UNKNOWN", occupancyMode: "NEGOTIABLE", contactExtension: "123",
+    authorizationDescription: "受房東委託", address: { cityCode: "66", districtCode: "01", addressLine: "測試路1號", buildingNumber: "甲棟", roomNumber: "東側A室", roomIdentifierSource: "CUSTOM", addressKind: "STANDARD" },
+    utilityCharges: [{ kind: "ELECTRICITY", mode: "METERED", variableRate: true, description: "夏季與非夏季不同，依說明收取" }],
+    equipmentItems: [{ code: "BED", status: "YES" }, { code: "TELEVISION", status: "UNKNOWN" }],
+    feeItems: [{ kind: "CAR_PARKING", label: "選配汽車位", mode: "FIXED", amount: 2000, frequency: "MONTHLY", required: false }] };
+  const created = await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send(payload).expect(201);
+  const id = created.body.data.draft.id;
+  expect(created.body.data.draft).toMatchObject({ ...payload, title: "新房源", hasElevator: null, petsAllowed: null, cookingAllowed: false, hasCarParking: true, hasMotorcycleParking: null });
+  await request(app).patch(`/api/v1/drafts/${id}`).set("Authorization", `Bearer ${token}`).send({ description: "只改說明" }).expect(200);
+  const read = await request(app).get(`/api/v1/drafts/${id}`).set("Authorization", `Bearer ${token}`).expect(200);
+  expect(read.body.data.draft).toMatchObject({ ...payload, title: "新房源", description: "只改說明" });
+  expect(await orm.listingEquipmentItem.count({ where: { listingId: id } })).toBe(2);
+  expect((await orm.listing.findUniqueOrThrow({ where: { id } })).publisherId).toBe(user.id);
+  expect(JSON.stringify(read.body)).not.toContain('"listingId"');
+});
+
+test("explicit empty child array clears only that collection and null clears only the selected status", async () => {
+  const { token } = await readyDraftIdentity();
+  const created = await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({
+    elevatorStatus: "YES", equipmentItems: [{ code: "BED", status: "NO" }],
+    utilityCharges: [{ kind: "WATER", mode: "BY_BILL", source: "自來水帳單" }],
+  }).expect(201);
+  const id = created.body.data.draft.id;
+  const changed = await request(app).patch(`/api/v1/drafts/${id}`).set("Authorization", `Bearer ${token}`).send({ equipmentItems: [], elevatorStatus: null }).expect(200);
+  expect(changed.body.data.draft).toMatchObject({ equipmentItems: [], elevatorStatus: null, hasElevator: null,
+    utilityCharges: [{ kind: "WATER", mode: "BY_BILL", source: "自來水帳單" }] });
+});
+
+test.each([
+  { rent: 0 }, { rent: 10000001 }, { areaPings: 1.001 }, { areaPings: 10000.01 }, { bedrooms: 101 },
+  { floorFrom: 0 }, { floorFrom: -21 }, { totalFloors: 201 }, { floorMode: "MULTIPLE", floors: [1, 1] },
+  { floorMode: "MULTIPLE", floors: [3], totalFloors: 2 }, { floors: [1] },
+  { rentalType: "SUITE" }, { buildingType: "RESIDENTIAL_BUILDING" }, { minimumLeaseMonths: 0 },
+  { title: " " }, { title: "a".repeat(81) }, { description: "<script>alert(1)</script>" },
+  { depositMonths: 100.01 }, { petConditions: "a".repeat(501) }, { contactExtension: "12x" },
+  { elevatorStatus: "UNKNOWN", hasElevator: false }, { petPolicy: "DISCUSS", petsAllowed: true },
+  { equipmentItems: [{ code: "BED", status: "YES" }, { code: "BED", status: "NO" }] },
+  { utilityCharges: [{ kind: "WATER", mode: "INCLUDED", amount: 30 }] },
+  { utilityCharges: [{ kind: "ELECTRICITY", mode: "METERED", variableRate: true, rate: 5 }] },
+  { feeItems: [{ kind: "OTHER", label: "未知", mode: "FIXED", amount: 1, frequency: "MONTHLY", required: true, listingId: "forged" }] },
+])("new draft rejects invalid supplied values without creating content: %j", async payload => {
+  const { token, user } = await readyDraftIdentity();
+  await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send(payload).expect(400);
+  expect(await orm.listing.count({ where: { publisherId: user.id } })).toBe(0);
+});
+
+test("legacy ambiguous fields remain readable and unchanged during a new-field edit", async () => {
+  const { token, user } = await readyDraftIdentity();
+  const row = await orm.listing.create({ data: { publisherId: user.id, rentalType: "SUITE", buildingType: "RESIDENTIAL_BUILDING", areaType: "權狀舊資料", areaPings: 9.1234, minimumLeaseTerm: "兩週", occupancyMode: "DATE", availableFrom: new Date("2020-01-01") } });
+  const response = await request(app).patch(`/api/v1/drafts/${row.id}`).set("Authorization", `Bearer ${token}`).send({ title: "可編輯舊資料", subsidyPolicy: "UNKNOWN" }).expect(200);
+  expect(response.body.data.draft).toMatchObject({ rentalType: "SUITE", buildingType: "RESIDENTIAL_BUILDING", areaType: "權狀舊資料", areaSource: null, areaPings: 9.1234, minimumLeaseTerm: "兩週", availableFrom: "2020-01-01" });
+  await request(app).patch(`/api/v1/drafts/${row.id}`).set("Authorization", `Bearer ${token}`).send({ availableFrom: "2020-01-01" }).expect(400);
+});
+
+test("child collections obey ownership and no partial changes survive invalid addresses", async () => {
+  const { token, user } = await readyDraftIdentity();
+  const row = await orm.listing.create({ data: { publisherId: user.id, title: "原標題", equipmentItems: { create: { code: "BED", status: "YES" } } } });
+  const payload = { title: "不該保存", equipmentItems: [{ code: "BED", status: "NO" }] };
+  await request(app).patch(`/api/v1/drafts/${row.id}`).set("Authorization", `Bearer ${otherToken}`).send(payload).expect(404);
+  await request(app).patch(`/api/v1/drafts/${row.id}`).set("Authorization", `Bearer ${token}`).send({ ...payload, address: { cityCode: "not-a-city" } }).expect(400);
+  expect(await orm.listing.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({ title: "原標題" });
+  expect(await orm.listingEquipmentItem.findMany({ where: { listingId: row.id } })).toMatchObject([{ code: "BED", status: "YES" }]);
+});
+
+test("simultaneous edits to independent child collections preserve both changes", async () => {
+  const { token, user } = await readyDraftIdentity();
+  const row = await orm.listing.create({ data: { publisherId: user.id } });
+  const endpoint = () => request(app).patch(`/api/v1/drafts/${row.id}`).set("Authorization", `Bearer ${token}`);
+  await Promise.all([
+    endpoint().send({ equipmentItems: [{ code: "BED", status: "YES" }] }).expect(200),
+    endpoint().send({ utilityCharges: [{ kind: "WATER", mode: "NOT_PROVIDED" }] }).expect(200),
+  ]);
+  expect(await orm.listingEquipmentItem.count({ where: { listingId: row.id } })).toBe(1);
+  expect(await orm.listingUtilityCharge.count({ where: { listingId: row.id } })).toBe(1);
+});
+
+test("a database failure after replacing children rolls back scalar, address and child writes", async () => {
+  const { auth, user } = await draftIdentity();
+  const row = await orm.listing.create({ data: { publisherId: user.id, title: "保留", equipmentItems: { create: { code: "BED", status: "YES" } } } });
+  await orm.$executeRawUnsafe(`CREATE FUNCTION fail_test_fee() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; END $$`);
+  await orm.$executeRawUnsafe(`CREATE TRIGGER fail_test_fee BEFORE INSERT ON "ListingFeeItem" FOR EACH ROW EXECUTE FUNCTION fail_test_fee()`);
+  try {
+    await expect(createDraftService(orm).patch(auth, row.id, { title: "不應寫入", address: { cityCode: "66" }, equipmentItems: [{ code: "BED", status: "NO" }],
+      feeItems: [{ kind: "OTHER", label: "test", mode: "NONE", required: false }] })).rejects.toThrow();
+    expect((await orm.listing.findUniqueOrThrow({ where: { id: row.id } })).title).toBe("保留");
+    expect(await orm.draftAddress.findUnique({ where: { listingId: row.id } })).toBeNull();
+    expect(await orm.listingEquipmentItem.findMany({ where: { listingId: row.id } })).toMatchObject([{ code: "BED", status: "YES" }]);
+  } finally {
+    await orm.$executeRawUnsafe(`DROP TRIGGER fail_test_fee ON "ListingFeeItem"`);
+    await orm.$executeRawUnsafe(`DROP FUNCTION fail_test_fee()`);
+  }
+});
+
+
+test("new detail collections cannot be silently overwritten via legacy aggregate fields", async () => {
+  const { token } = await readyDraftIdentity();
+  const result = await request(app).post("/api/v1/drafts").set("Authorization", `Bearer ${token}`).send({
+    equipmentItems: [{ code: "BED", status: "YES" }], utilityCharges: [{ kind: "WATER", mode: "BY_BILL", source: "帳單" }],
+    feeItems: [{ kind: "MANAGEMENT", label: "管理費", mode: "FIXED", amount: 1000, frequency: "MONTHLY", required: true }],
+  }).expect(201);
+  const id = result.body.data.draft.id;
+  for (const payload of [{ equipmentMode: "NONE" }, { waterBilling: "INCLUDED" }, { managementFee: 2000 }]) {
+    await request(app).patch(`/api/v1/drafts/${id}`).set("Authorization", `Bearer ${token}`).send(payload).expect(400);
+  }
+  const read = await request(app).get(`/api/v1/drafts/${id}`).set("Authorization", `Bearer ${token}`).expect(200);
+  expect(read.body.data.draft).toMatchObject({ equipmentItems: [{ code: "BED", status: "YES" }], utilityCharges: [{ kind: "WATER", mode: "BY_BILL" }], feeItems: [{ amount: 1000 }] });
 });
