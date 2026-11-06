@@ -266,7 +266,7 @@ model Listing {
   archiveReason    ArchiveReason?
   trashedAt        DateTime?
 
-  // 02-07：此欄僅記明確選擇；公開仍須檢查有效付費資格。
+  // C08：全方案可明確選擇公開；仍須檢查當前同意、內容資格與隱私，並非付費權益。
   exactAddressConsentAt DateTime?
 
   // 02-06：房源聯絡資料獨立於帳號及未來品牌。

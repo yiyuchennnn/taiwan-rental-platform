@@ -1,0 +1,39 @@
+{
+  "dateTaipei": "2026-11-06",
+  "baselineCommit": "801556ed19e7189a68e609147ff4e462e2b1fe08",
+  "verification": {
+    "apiTests": {
+      "filesPassed": 9,
+      "testsPassed": 234,
+      "database": "isolated temporary PostgreSQL",
+      "realR2Called": false
+    },
+    "rootTypecheck": "passed",
+    "rootBuild": "passed; only existing API workspace, not frontend",
+    "diffCheck": "passed",
+    "markdownUtf8AndLocalLinks": {
+      "checkedFiles": 15,
+      "errors": []
+    }
+  },
+  "knownWarnings": [
+    "Prisma/pg concurrent client.query deprecation"
+  ],
+  "notRun": [
+    "fresh dependency installation",
+    "real R2 verification",
+    "payment integration",
+    "browser UI",
+    "load test",
+    "penetration test",
+    "privacy inference test"
+  ],
+  "deployment": {
+    "environmentPublished": false,
+    "productionMigrationApplied": false
+  },
+  "decisionsPending": [
+    "D01: over-capacity transfer with exact zero added bytes",
+    "D02: quota when restoring restricted content from trash"
+  ]
+}

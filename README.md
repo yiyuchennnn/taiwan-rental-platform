@@ -5,6 +5,7 @@
 ## 目前狀態與架構
 
 - [進度執行表](docs/requirements/進度執行表.md)：目前唯一的狀態摘要，依 01／02 與後續明確同意決策對照。
+- [01／02全文核對與待決討論](docs/requirements/01與02全文核對與待決討論_2026-11-06.md)：2026-11-06原文矛盾修正、待決方案、四種狀態與外部依賴。
 - [全專案需求與相容性審查](docs/requirements/全專案需求與相容性審查.md)：2026-11-03 的缺陷、修正、證據與未完成。
 - `apps/api/src/server.ts → app.ts → app-factory.ts` 是服務組裝入口；auth／listings／entitlements／media 分模組，router 接 service，資料庫與圖片儲存以依賴注入供整合測試使用。
 - `apps/web`、`packages/contracts` 仍只有占位檔，沒有可啟動的前端或共用契約。`npm run dev:web` 目前不可用，根目錄 build 成功也不代表前端已建好。

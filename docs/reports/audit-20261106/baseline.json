@@ -1,0 +1,195 @@
+{
+  "dateTaipei": "2026-11-06",
+  "baselineCommit": "801556ed19e7189a68e609147ff4e462e2b1fe08",
+  "scope": "01/02全文與相關實作證據核對；不是全平台安全或上線認證",
+  "files": [
+    {
+      "path": "行政資料/01_需求與版本範圍.md",
+      "sha256": "a8d12f390241f578068f0fb298eba8780f3cb717a2dd7cfbae18ea34a395bdd2"
+    },
+    {
+      "path": "行政資料/02_商業規則與狀態.md",
+      "sha256": "01aaebff7f015b346d4daa16ce007df5cb600539449e05c9f031563c3554707e"
+    },
+    {
+      "path": "apps/api/src/app-factory.ts",
+      "sha256": "e60336ada358cdd9f1cc58d5820da0cd7d6f2244b04feff019ffecc9548fbd9c"
+    },
+    {
+      "path": "apps/api/src/app.ts",
+      "sha256": "6ac46402561f742f20d7dc49c9e3d0b5b177f0279d70aa0576e4d6b1d82254df"
+    },
+    {
+      "path": "apps/api/src/lib/prisma.ts",
+      "sha256": "19b8b56faeaea0ba1ec6044b0a41d6fa20f572db41e0e9c69c306616f0269f90"
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.controller.ts",
+      "sha256": "985acb79ef26196cf4f387bf3ac9a63dec3f67eaf8bc15e4a27c88affe1b0fda"
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.router-factory.ts",
+      "sha256": "1fc2ba7eed24d9394bad760993a62195fc2a22d922372aab02cae2a92bd65e2b"
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.routes.ts",
+      "sha256": "a7891e9397b373c2e587f6539d9f9a283bad6146591fa8c6c2f731a3ffe0abc0"
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.schema.ts",
+      "sha256": "0502a708172975b979fe803011b8908bf372d5da8f837796554f65a6f8d1e9ac"
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.service.ts",
+      "sha256": "50919ff55ee854e69ac10ec5864eb38a426169706a192048cffdfded34e065e0"
+    },
+    {
+      "path": "apps/api/src/modules/auth/require-auth.ts",
+      "sha256": "5cc410f740684aefe6da268da5a27ae4559d535c3ad81a9c18b59428682c3eb1"
+    },
+    {
+      "path": "apps/api/src/modules/auth/session.service.ts",
+      "sha256": "6b7ce3c2057f8499c5227bedb5dc723ec595a53747129f55b935f1d0543c0a0f"
+    },
+    {
+      "path": "apps/api/src/modules/entitlements/entitlement.service.ts",
+      "sha256": "d92490dd676ae3e400d506fd03a6d45c14c6d55b3fd8fe8d3bd6438b0d4e4ca9"
+    },
+    {
+      "path": "apps/api/src/modules/entitlements/plan-catalog.ts",
+      "sha256": "1e9ea96a3199278e34bec0bfbba7b4361aa240d77c6179ecaf010c77ec58a94b"
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft-address.ts",
+      "sha256": "a8e8d0b06adc25cbdedcbf347017684a3a14ec0757fd6a672d8c0a130f623c12"
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft-creation-policy.ts",
+      "sha256": "b2a2a901aea0e071648a87ff71d8098b40f7b32d9eacd9c7e26b9090d8ccdda5"
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft.routes.ts",
+      "sha256": "0fe1ac23b5aa620af95462b580b4fbaeea6caadf68fae5faeacc0705200acdb0"
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft.schema.ts",
+      "sha256": "9a980aa09cb2a5b70605c4a01940bd6f7472eeb2091a0fc89204f9e30024fbc5"
+    },
+    {
+      "path": "apps/api/src/modules/listings/draft.service.ts",
+      "sha256": "af4819fc7c4dd7e16ea3d48184176e7eae7740c7a2f5fc418f44163b19f292c3"
+    },
+    {
+      "path": "apps/api/src/modules/listings/input-rules.ts",
+      "sha256": "63a4c4f5e9d32b2a28d7a4226cdb37062eb5ee5675c75e0c335fa6d42068afd0"
+    },
+    {
+      "path": "apps/api/src/modules/listings/listing-options.ts",
+      "sha256": "aebb018cb3fd2612b4e07b25dc4f06048c9ae36b672642c0489a53df3f3ecd4b"
+    },
+    {
+      "path": "apps/api/src/modules/listings/publication-check.ts",
+      "sha256": "adfac7d4822b3ac3936167b7a5bfce889dafa068fb30ef9cfe292ef93de8275b"
+    },
+    {
+      "path": "apps/api/src/modules/listings/publication-details-storage.ts",
+      "sha256": "827b4a0b49305ffb7893e6e3e5be3c0d55787f62f4460d644c389a11a6c0448b"
+    },
+    {
+      "path": "apps/api/src/modules/listings/publication-details.ts",
+      "sha256": "2823b72b6602d98d98efb45e648cfec09dd478c060a6a6c68cf765cfab4c2f7b"
+    },
+    {
+      "path": "apps/api/src/modules/listings/require-listing-owner.ts",
+      "sha256": "f190b44fc70455ba04570a9e24bd179f2921033f908efa180172f836f36da5b6"
+    },
+    {
+      "path": "apps/api/src/modules/listings/storage-numbers.ts",
+      "sha256": "13823b9a9f31bddfbed53ecf40e1a7ca1827225ec903bb8738ba80c163f209d1"
+    },
+    {
+      "path": "apps/api/src/modules/media/draft-media.routes.ts",
+      "sha256": "fad328839c2d276f26d9c41554ef46bc55f46a81b43ffa2ae931cd42479de9d4"
+    },
+    {
+      "path": "apps/api/src/modules/media/draft-media.service.ts",
+      "sha256": "ec31aaa2b31e9cd657f7ca699101eb33f17be40c13d8fdf2a227371065849415"
+    },
+    {
+      "path": "apps/api/src/modules/media/image-profile.ts",
+      "sha256": "9872de4ccb53ac21ca695b6608b4e3dfae7ac7906d973746b4af677b57371a0a"
+    },
+    {
+      "path": "apps/api/src/modules/media/media-runtime.ts",
+      "sha256": "db37fccacaa7cb74e4e7a83e0786e991fd02cc0d37d5979dcf65202731f453e4"
+    },
+    {
+      "path": "apps/api/src/modules/media/private-image-store.ts",
+      "sha256": "a4d6cd48258218935c1a5d94fd2d355b70bec657f2cfab0aa7355c121eca61ce"
+    },
+    {
+      "path": "apps/api/src/modules/media/process-and-store.ts",
+      "sha256": "da7dadaef2453df37bc1d478f19b3a082aa8bbc5d1418cf916ed4c7f580bcd34"
+    },
+    {
+      "path": "apps/api/src/modules/media/process-image.ts",
+      "sha256": "78dee829218388b83e5dbfd7981bcb4dd91f01f2e4a2ef6ac0244d4e0e1db463"
+    },
+    {
+      "path": "apps/api/src/modules/media/r2-config.ts",
+      "sha256": "56c32f8f3f7b27565548c8155743993582746af83cff9f27ed7ad9b8b6d48547"
+    },
+    {
+      "path": "apps/api/src/modules/media/r2-image-store.ts",
+      "sha256": "dfba61766c2c19b27218c8e7dd74db40d4bef93c2a562458ddd3ecf96560fd3a"
+    },
+    {
+      "path": "apps/api/src/modules/media/storage-capacity.ts",
+      "sha256": "e4175f29fa14c7cdc3d57afb6a80409e52d5afce12dce6023cf10bc9f9ea922d"
+    },
+    {
+      "path": "apps/api/src/server.ts",
+      "sha256": "91fc4e81835bafa8f0621aa1b377f091a1fae0d12bac7f693943017f8a5133d6"
+    },
+    {
+      "path": "apps/api/tests/auth-session.test.ts",
+      "sha256": "0bfcb6c78ebcf0877fc5fbd8cbf5889caec47b6af0f690fcff4691a045785355"
+    },
+    {
+      "path": "apps/api/tests/draft-media.test.ts",
+      "sha256": "c08b27d5e2e7da86545b1bca0112abf087085397418e01e99473cb209ce5b90b"
+    },
+    {
+      "path": "apps/api/tests/image-processing.test.ts",
+      "sha256": "386edcda24236c225c7d9e7cee7a32de8b0025db5e84807dc791be78c5d70d78"
+    },
+    {
+      "path": "apps/api/tests/image-profile-capacity.test.ts",
+      "sha256": "b01002b3ff9efb3d419ee2eea89403640acae6c4ab2152c1020dc8c690e2ae9e"
+    },
+    {
+      "path": "apps/api/tests/listing-model.test.ts",
+      "sha256": "a79fb75ac9c0738549bb87e89a52776a7ad365adddba482b84950dc715d4db94"
+    },
+    {
+      "path": "apps/api/tests/publication-check.test.ts",
+      "sha256": "89fb0872d372f5945b05a5d58577c7d073b70c2ff5879ad5ebc1eab77ed93206"
+    },
+    {
+      "path": "apps/api/tests/publication-details.test.ts",
+      "sha256": "696d1880bcddad9ca82624fd74459eca76ed7815d20753d35a77b4e334065a39"
+    },
+    {
+      "path": "apps/api/tests/r2-image-store.test.ts",
+      "sha256": "d8722ab79750a5fe69383c4ae4c6b9c637de8139a98fee16b75104726e5dc20a"
+    },
+    {
+      "path": "apps/api/tests/storage-settlement.test.ts",
+      "sha256": "7ffeb57482a9ef4908c385e48c13b93d6dc7e4b01ad2a781cb305742d46ec6e3"
+    },
+    {
+      "path": "apps/api/prisma/schema.prisma",
+      "sha256": "d7570656a1bcb8306ecad3014454751fbe6972826089529003d3c9ab5aea0d1b"
+    }
+  ]
+}
