@@ -1,0 +1,469 @@
+{
+  "sourceCommit": "5e148219500558089cf5cf121b626b17fdde9b92",
+  "pipelineCommit": "33ea8f16b2a36dfaa88a3c0df3d81ecdda2b73ef",
+  "versions": {
+    "aom": "3.15.1",
+    "archive": "3.8.9",
+    "cairo": "1.18.6",
+    "cgif": "0.5.4",
+    "exif": "0.6.26",
+    "expat": "2.8.5",
+    "ffi": "3.8.0",
+    "fontconfig": "2.18.3",
+    "freetype": "2.14.3",
+    "fribidi": "1.0.17",
+    "glib": "2.90.0",
+    "harfbuzz": "14.5.0",
+    "heif": "1.23.5",
+    "highway": "1.4.0",
+    "imagequant": "2.4.1",
+    "lcms": "2.19.1",
+    "mozjpeg": "0826579",
+    "pango": "1.58.2",
+    "pixman": "0.46.4",
+    "png": "1.6.58",
+    "proxy-libintl": "0.5",
+    "rsvg": "2.63.2",
+    "tiff": "4.7.2",
+    "uhdr": "2.0.2",
+    "vips": "8.18.7",
+    "webp": "1.6.0",
+    "xml2": "2.15.4",
+    "zlib-ng": "2.3.3",
+    "sharp": "0.35.5"
+  },
+  "rows": [
+    {
+      "file": "100_bathroom.jpg",
+      "width": 1024,
+      "height": 683,
+      "source": 428033,
+      "display": 55696,
+      "thumb": 16540,
+      "total": 72236
+    },
+    {
+      "file": "100_bedroom.jpg",
+      "width": 636,
+      "height": 424,
+      "source": 42411,
+      "display": 32160,
+      "thumb": 20056,
+      "total": 52216
+    },
+    {
+      "file": "100_frontal.jpg",
+      "width": 1024,
+      "height": 683,
+      "source": 282545,
+      "display": 134002,
+      "thumb": 35202,
+      "total": 169204
+    },
+    {
+      "file": "100_kitchen.jpg",
+      "width": 1024,
+      "height": 683,
+      "source": 223147,
+      "display": 93734,
+      "thumb": 27100,
+      "total": 120834
+    },
+    {
+      "file": "150_bathroom.jpg",
+      "width": 640,
+      "height": 426,
+      "source": 46341,
+      "display": 29596,
+      "thumb": 18952,
+      "total": 48548
+    },
+    {
+      "file": "150_bedroom.jpg",
+      "width": 640,
+      "height": 426,
+      "source": 49411,
+      "display": 33654,
+      "thumb": 22846,
+      "total": 56500
+    },
+    {
+      "file": "150_frontal.jpg",
+      "width": 640,
+      "height": 426,
+      "source": 64905,
+      "display": 51142,
+      "thumb": 32302,
+      "total": 83444
+    },
+    {
+      "file": "150_kitchen.jpg",
+      "width": 640,
+      "height": 426,
+      "source": 52441,
+      "display": 35790,
+      "thumb": 23606,
+      "total": 59396
+    },
+    {
+      "file": "1_bathroom.jpg",
+      "width": 720,
+      "height": 480,
+      "source": 110591,
+      "display": 92822,
+      "thumb": 44188,
+      "total": 137010
+    },
+    {
+      "file": "1_bedroom.jpg",
+      "width": 720,
+      "height": 480,
+      "source": 94598,
+      "display": 68230,
+      "thumb": 33930,
+      "total": 102160
+    },
+    {
+      "file": "1_frontal.jpg",
+      "width": 720,
+      "height": 480,
+      "source": 122597,
+      "display": 103862,
+      "thumb": 47270,
+      "total": 151132
+    },
+    {
+      "file": "1_kitchen.jpg",
+      "width": 720,
+      "height": 480,
+      "source": 112777,
+      "display": 83254,
+      "thumb": 41560,
+      "total": 124814
+    },
+    {
+      "file": "200_bathroom.jpg",
+      "width": 1021,
+      "height": 783,
+      "source": 93746,
+      "display": 77640,
+      "thumb": 19550,
+      "total": 97190
+    },
+    {
+      "file": "200_bedroom.jpg",
+      "width": 900,
+      "height": 600,
+      "source": 51781,
+      "display": 45204,
+      "thumb": 14482,
+      "total": 59686
+    },
+    {
+      "file": "200_frontal.jpg",
+      "width": 900,
+      "height": 600,
+      "source": 119401,
+      "display": 121612,
+      "thumb": 35308,
+      "total": 156920
+    },
+    {
+      "file": "200_kitchen.jpg",
+      "width": 900,
+      "height": 600,
+      "source": 61631,
+      "display": 48142,
+      "thumb": 18914,
+      "total": 67056
+    },
+    {
+      "file": "250_bathroom.jpg",
+      "width": 1024,
+      "height": 682,
+      "source": 68549,
+      "display": 45124,
+      "thumb": 18314,
+      "total": 63438
+    },
+    {
+      "file": "250_bedroom.jpg",
+      "width": 1024,
+      "height": 682,
+      "source": 73201,
+      "display": 50232,
+      "thumb": 20586,
+      "total": 70818
+    },
+    {
+      "file": "250_frontal.jpg",
+      "width": 1024,
+      "height": 678,
+      "source": 73365,
+      "display": 53484,
+      "thumb": 21336,
+      "total": 74820
+    },
+    {
+      "file": "250_kitchen.jpg",
+      "width": 1024,
+      "height": 682,
+      "source": 81438,
+      "display": 59624,
+      "thumb": 24488,
+      "total": 84112
+    },
+    {
+      "file": "300_bathroom.jpg",
+      "width": 623,
+      "height": 414,
+      "source": 86983,
+      "display": 29254,
+      "thumb": 19638,
+      "total": 48892
+    },
+    {
+      "file": "300_bedroom.jpg",
+      "width": 623,
+      "height": 414,
+      "source": 78901,
+      "display": 26008,
+      "thumb": 17394,
+      "total": 43402
+    },
+    {
+      "file": "300_frontal.jpg",
+      "width": 623,
+      "height": 414,
+      "source": 104166,
+      "display": 43788,
+      "thumb": 27618,
+      "total": 71406
+    },
+    {
+      "file": "300_kitchen.jpg",
+      "width": 623,
+      "height": 414,
+      "source": 97751,
+      "display": 36416,
+      "thumb": 25006,
+      "total": 61422
+    },
+    {
+      "file": "350_bathroom.jpg",
+      "width": 767,
+      "height": 575,
+      "source": 41334,
+      "display": 21810,
+      "thumb": 11662,
+      "total": 33472
+    },
+    {
+      "file": "350_bedroom.jpg",
+      "width": 767,
+      "height": 575,
+      "source": 42901,
+      "display": 22166,
+      "thumb": 11374,
+      "total": 33540
+    },
+    {
+      "file": "350_frontal.jpg",
+      "width": 767,
+      "height": 498,
+      "source": 62181,
+      "display": 49000,
+      "thumb": 23768,
+      "total": 72768
+    },
+    {
+      "file": "350_kitchen.jpg",
+      "width": 767,
+      "height": 575,
+      "source": 40722,
+      "display": 23692,
+      "thumb": 13004,
+      "total": 36696
+    },
+    {
+      "file": "400_bathroom.jpg",
+      "width": 767,
+      "height": 431,
+      "source": 39957,
+      "display": 24394,
+      "thumb": 13128,
+      "total": 37522
+    },
+    {
+      "file": "400_bedroom.jpg",
+      "width": 767,
+      "height": 431,
+      "source": 48748,
+      "display": 33142,
+      "thumb": 17176,
+      "total": 50318
+    },
+    {
+      "file": "400_frontal.jpg",
+      "width": 767,
+      "height": 431,
+      "source": 71908,
+      "display": 63938,
+      "thumb": 28778,
+      "total": 92716
+    },
+    {
+      "file": "400_kitchen.jpg",
+      "width": 767,
+      "height": 431,
+      "source": 45156,
+      "display": 30224,
+      "thumb": 16032,
+      "total": 46256
+    },
+    {
+      "file": "450_bathroom.jpg",
+      "width": 640,
+      "height": 427,
+      "source": 46872,
+      "display": 34128,
+      "thumb": 19728,
+      "total": 53856
+    },
+    {
+      "file": "450_bedroom.jpg",
+      "width": 640,
+      "height": 427,
+      "source": 50350,
+      "display": 40624,
+      "thumb": 23340,
+      "total": 63964
+    },
+    {
+      "file": "450_frontal.jpg",
+      "width": 640,
+      "height": 427,
+      "source": 81264,
+      "display": 74478,
+      "thumb": 39952,
+      "total": 114430
+    },
+    {
+      "file": "450_kitchen.jpg",
+      "width": 640,
+      "height": 360,
+      "source": 44348,
+      "display": 33436,
+      "thumb": 20652,
+      "total": 54088
+    },
+    {
+      "file": "500_bathroom.jpg",
+      "width": 1020,
+      "height": 680,
+      "source": 82737,
+      "display": 51032,
+      "thumb": 17224,
+      "total": 68256
+    },
+    {
+      "file": "500_bedroom.jpg",
+      "width": 1020,
+      "height": 680,
+      "source": 158576,
+      "display": 136986,
+      "thumb": 39992,
+      "total": 176978
+    },
+    {
+      "file": "500_frontal.jpg",
+      "width": 1020,
+      "height": 680,
+      "source": 181656,
+      "display": 165324,
+      "thumb": 41794,
+      "total": 207118
+    },
+    {
+      "file": "500_kitchen.jpg",
+      "width": 1020,
+      "height": 680,
+      "source": 130047,
+      "display": 97038,
+      "thumb": 32446,
+      "total": 129484
+    },
+    {
+      "file": "50_bathroom.jpg",
+      "width": 1024,
+      "height": 767,
+      "source": 65986,
+      "display": 45286,
+      "thumb": 16470,
+      "total": 61756
+    },
+    {
+      "file": "50_bedroom.jpg",
+      "width": 1024,
+      "height": 767,
+      "source": 77861,
+      "display": 59512,
+      "thumb": 18700,
+      "total": 78212
+    },
+    {
+      "file": "50_frontal.jpg",
+      "width": 1024,
+      "height": 661,
+      "source": 118873,
+      "display": 116800,
+      "thumb": 33112,
+      "total": 149912
+    },
+    {
+      "file": "50_kitchen.jpg",
+      "width": 1024,
+      "height": 767,
+      "source": 84239,
+      "display": 61560,
+      "thumb": 21804,
+      "total": 83364
+    },
+    {
+      "file": "535_bathroom.jpg",
+      "width": 1020,
+      "height": 679,
+      "source": 98993,
+      "display": 68088,
+      "thumb": 19510,
+      "total": 87598
+    },
+    {
+      "file": "535_bedroom.jpg",
+      "width": 1020,
+      "height": 679,
+      "source": 87996,
+      "display": 61494,
+      "thumb": 16358,
+      "total": 77852
+    },
+    {
+      "file": "535_frontal.jpg",
+      "width": 1020,
+      "height": 679,
+      "source": 158911,
+      "display": 140774,
+      "thumb": 39162,
+      "total": 179936
+    },
+    {
+      "file": "535_kitchen.jpg",
+      "width": 1020,
+      "height": 679,
+      "source": 104821,
+      "display": 74976,
+      "thumb": 22326,
+      "total": 97302
+    }
+  ]
+}
