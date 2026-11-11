@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { checkConfirmedPublicationRules } from "./publication-check.js";
 import type { Listing, Prisma, PrismaClient } from "@prisma/client";
 import type { AuthenticatedSession } from "../auth/require-auth.js";
 import { childFields, patchDraftDetails, readDraftDetails } from "./draft-details.js";
@@ -181,6 +182,16 @@ export function createDraftService(db: PrismaClient, creationPolicy: DraftCreati
     return row;
   }
   return {
+    async validation(auth: AuthenticatedSession, id: string) {
+      return db.$transaction(async tx => {
+        await authenticated(tx, auth);
+        const row = await owned(tx, auth.user.id, id);
+        const draft = await response(tx, row);
+        const media = await tx.listingMedia.findMany({ where: { listingId: id },
+          select: { isCover: true, asset: { select: { displayUrl: true, thumbnailUrl: true, gpsRemovedAt: true } } } });
+        return checkConfirmedPublicationRules({ ...draft, media });
+      });
+    },
     async read(auth: AuthenticatedSession, id: string) {
       return db.$transaction(async tx => { await authenticated(tx, auth); return response(tx, await owned(tx, auth.user.id, id)); });
     },

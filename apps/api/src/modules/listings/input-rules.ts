@@ -44,9 +44,16 @@ export const utilityChargeSchema = z.object({ kind:utilityKind, mode:z.enum(['IN
 export const equipmentCodes=['BED','WARDROBE','DESK_CHAIR','SOFA','REFRIGERATOR','AIR_CONDITIONER','WASHING_MACHINE','WATER_HEATER','TELEVISION'] as const;
 export const equipmentItemSchema=z.object({code:z.enum(equipmentCodes),status:status3}).strict();
 export const feeItemSchema=z.object({kind:z.enum(['MANAGEMENT','CAR_PARKING','MOTORCYCLE_PARKING','PET','SERVICE','OTHER']),
-  label:freeText,mode:z.enum(['INCLUDED','NONE','FIXED','USAGE']),amount:z.number().int().min(1).max(10000000).nullable().optional(),
+  label:freeText,mode:z.enum(['INCLUDED','NONE','FIXED','USAGE','PERCENT']),amount:z.number().int().min(1).max(10000000).nullable().optional(),
   frequency:feeFrequency.nullable().optional(),required:z.boolean(),description:freeText.nullable().optional(),
-}).strict().superRefine((v,c)=>{if(v.mode!=='FIXED' && (v.amount!=null || v.frequency!=null))c.addIssue({code:'custom',path:['amount'],message:'只有固定另收使用金額及週期'});});
+  percentage:decimalWithin('0.01','100').nullable().optional(), paymentTiming:freeText.nullable().optional(), payee:freeText.nullable().optional(),
+}).strict().superRefine((v,c)=>{
+  if(v.kind==='SERVICE' && !['NONE','FIXED','PERCENT'].includes(v.mode))c.addIssue({code:'custom',path:['mode'],message:'服務費須明確免收、固定金額或比例'});
+  if(v.kind==='SERVICE' && v.frequency!=null && v.frequency!=='ONCE')c.addIssue({code:'custom',path:['frequency'],message:'一次服務費不混入週期租金'});
+  if(v.mode!=='FIXED' && v.amount!=null)c.addIssue({code:'custom',path:['amount'],message:'只有固定另收使用金額'});
+  if(v.mode!=='FIXED' && v.mode!=='PERCENT' && v.frequency!=null)c.addIssue({code:'custom',path:['frequency'],message:'此模式不使用固定週期'});
+  if((v.mode==='PERCENT' && v.kind!=='SERVICE') || (v.mode!=='PERCENT' && v.percentage!=null))c.addIssue({code:'custom',path:['percentage'],message:'只有服務費比例模式使用百分比'});
+});
 export const uniqueArray = <T extends z.ZodType>(schema:T,key:string,max?:number) => {
   const a=z.array(schema); return (max===undefined?a:a.max(max)).refine(items=>new Set(items.map(item=>(item as Record<string,unknown>)[key])).size===items.length,'同一項目不可重複');
 };

@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
 import { publicationDetailsSchema } from "../src/modules/listings/publication-details.js";
 
-const base = () => ({ rentalType: "SUITE", buildingType: "TOWNHOUSE", hasElevator: false,
+const base = () => ({ rentalType: "INDEPENDENT_SUITE", buildingType: "TOWNHOUSE", hasElevator: false,
   deposit: { mode: "MONTHS", months: 2 }, managementFee: { mode: "INCLUDED" },
-  occupancy: { mode: "IMMEDIATE" }, minimumLeaseTerm: "可短租，另議", equipment: { mode: "NONE" },
+  occupancy: { mode: "IMMEDIATE" }, minimumLeaseMonths: 1, equipment: { mode: "NONE" },
   floor: { mode: "SINGLE", level: -1 }, totalFloors: 4, privateBathrooms: 1, balcony: { mode: "NONE" } });
 test("suite supports basement, no equipment, immediate occupancy and no room/living-room counts", () => {
   expect(publicationDetailsSchema.safeParse(base()).success).toBe(true);
@@ -11,9 +11,9 @@ test("suite supports basement, no equipment, immediate occupancy and no room/liv
 test.each(["NONE", "INCLUDED"])("management fee %s requires no extra typing", mode => {
   expect(publicationDetailsSchema.safeParse({ ...base(), managementFee: { mode } }).success).toBe(true);
 });
-test("separate management fee and fixed deposit require explicit amounts including zero", () => {
+test("fixed management fee and deposit require positive amounts; zero uses NONE", () => {
   expect(publicationDetailsSchema.safeParse({ ...base(), managementFee: { mode: "SEPARATE" } }).success).toBe(false);
-  expect(publicationDetailsSchema.safeParse({ ...base(), managementFee: { mode: "SEPARATE", amount: 0 }, deposit: { mode: "FIXED", amount: 0 } }).success).toBe(true);
+  expect(publicationDetailsSchema.safeParse({ ...base(), managementFee: { mode: "SEPARATE", amount: 0 }, deposit: { mode: "FIXED", amount: 0 } }).success).toBe(false);
 });
 test("selected occupancy date must be a real date", () => {
   expect(publicationDetailsSchema.safeParse({ ...base(), occupancy: { mode: "DATE", date: "2026-02-30" } }).success).toBe(false);
@@ -37,7 +37,7 @@ test("floor ranges have ordered endpoints and preserve basement floors", () => {
   expect(publicationDetailsSchema.safeParse({ ...base(), floor: { mode: "RANGE", from: -1, to: 1 } }).success).toBe(true);
   expect(publicationDetailsSchema.safeParse({ ...base(), floor: { mode: "RANGE", from: 4, to: 3 } }).success).toBe(false);
 });
-test.each([{ mode: "SINGLE", level: 0 }, { mode: "RANGE", from: 0, to: 2 }, { mode: "RANGE", from: -1, to: 0 }])("zero floor remains unresolved for publication: %j", floor => {
+test.each([{ mode: "SINGLE", level: 0 }, { mode: "RANGE", from: 0, to: 2 }, { mode: "RANGE", from: -1, to: 0 }])("zero floor is rejected by current rules: %j", floor => {
   expect(publicationDetailsSchema.safeParse({ ...base(), floor }).success).toBe(false);
 });
 test("equipment selection cannot silently claim equipment exists with an empty list", () => {
@@ -49,18 +49,18 @@ test("suite requires a private bathroom and explicit balcony choice", () => {
   expect(publicationDetailsSchema.safeParse(value).success).toBe(false);
 });
 
-test.each([0.00001, 1.23456, 100000000])("rejects deposit months %s that cannot be stored unchanged", months => {
+test.each([0.00001, 1.23456, 100000000])("rejects deposit months %s outside product precision or range", months => {
   const result = publicationDetailsSchema.safeParse({ ...base(), deposit: { mode: "MONTHS", months } });
   expect(result.success).toBe(false);
   if (!result.success) expect(result.error.issues[0].path).toEqual(["deposit", "months"]);
 });
-test.each([0.0001, 1.2345, 99999999.9999])("accepts exactly representable deposit months %s", months => {
+test.each([0.01, 1.25, 100])("accepts current product deposit-month boundary %s", months => {
   expect(publicationDetailsSchema.safeParse({ ...base(), deposit: { mode: "MONTHS", months } }).success).toBe(true);
 });
-test.each(["deposit", "managementFee"])("rejects %s amount outside PostgreSQL integer capacity", field => {
+test.each(["deposit", "managementFee"])("rejects %s amount outside product bounds", field => {
   const mode = field === "deposit" ? "FIXED" : "SEPARATE";
   expect(publicationDetailsSchema.safeParse({ ...base(), [field]: { mode, amount: 2147483648 } }).success).toBe(false);
-  expect(publicationDetailsSchema.safeParse({ ...base(), [field]: { mode, amount: 2147483647 } }).success).toBe(true);
+  expect(publicationDetailsSchema.safeParse({ ...base(), [field]: { mode, amount: 10000000 } }).success).toBe(true);
 });
 test("rejects count and floor numbers outside storage capacity", () => {
   expect(publicationDetailsSchema.safeParse({ ...base(), bedrooms: 2147483648 }).success).toBe(false);

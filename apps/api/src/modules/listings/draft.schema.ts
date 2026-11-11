@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { textField, decimalWithin, rentalTypes, buildingTypes, floorNumber, status3, permission3,
-  feeFrequency, utilityChargeSchema, equipmentItemSchema, feeItemSchema, uniqueArray } from "./input-rules.js";
+  phoneSchema, lineSchema, freeText, feeFrequency, utilityChargeSchema, equipmentItemSchema, feeItemSchema, uniqueArray } from "./input-rules.js";
 import { draftAddressPatchSchema } from "./draft-address.js";
 
-const integer = z.number().int().min(-2147483648).max(2147483647);
 const count = z.number().int().min(0).max(100).nullable();
 const money = z.number().int().min(0).max(10000000).nullable();
-const text = z.string().nullable();
+const text = freeText.nullable();
 const flag = z.boolean().nullable();
 const billing = z.enum(["INCLUDED", "BY_BILL", "SEPARATE", "NOT_PROVIDED"]).nullable();
 const decimal = decimalWithin("0.01", "10000").nullable();
@@ -32,13 +31,13 @@ export const draftPatchSchema = z.object({
   internetBilling: billing, internetFeeDescription: text,
   hasCarParking: flag, carParkingType: text, carParkingIncludedInRent: flag, carParkingFee: money,
   hasMotorcycleParking: flag, motorcycleParkingType: text, motorcycleParkingIncludedInRent: flag, motorcycleParkingFee: money,
-  equipmentMode: z.enum(["NONE", "PRESENT"]).nullable(), furniture: z.array(z.string()), appliances: z.array(z.string()),
+  equipmentMode: z.enum(["NONE", "PRESENT"]).nullable(), furniture: z.array(freeText), appliances: z.array(freeText),
   balconyMode: z.enum(["NONE", "PRIVATE", "SHARED"]).nullable(),
   sharedSpaces: z.array(z.enum(["BATHROOM", "KITCHEN", "LIVING_ROOM", "LAUNDRY", "BALCONY"])), sharedSpaceDescription: text,
   cookingAllowed: flag, laundryDescription: text, dryingDescription: text, garbageDisposalDescription: text,
   minimumLeaseTerm: text, occupancyMode: z.enum(["IMMEDIATE", "DATE", "NEGOTIABLE"]).nullable(), availableFrom: z.iso.date().nullable(),
   petsAllowed: flag, petConditions: textField(500).nullable(), petFeeDescription: text, additionalConditions: text, subsidyDescription: text,
-  contactName: textField(50).nullable(), contactPhone: text, contactEmail: text, contactLine: text,
+  contactName: textField(50).nullable(), contactPhone: phoneSchema.nullable(), contactEmail: z.email().nullable(), contactLine: lineSchema.nullable(),
   publisherType: z.enum(["LANDLORD", "AGENT", "AUTHORIZED_REPRESENTATIVE"]).nullable(), companyName: textField(100).nullable(), serviceFeeDescription: text,
   elevatorStatus: status3.nullable(), petPolicy: permission3.nullable(), cookingPolicy: permission3.nullable(),
   laundryStatus: z.enum(["PRIVATE", "SHARED", "NONE", "UNKNOWN"]).nullable(),

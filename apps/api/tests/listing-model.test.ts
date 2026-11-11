@@ -228,9 +228,9 @@ test("new input modes preserve legacy unknowns, amounts and location without inf
 
 test("structured listing section round trips and changing modes clears stale dependent values", async () => {
   const orm = new PrismaClient({ adapter: new PrismaPg({ host: root, database: "postgres", user: "postgres", port: 5432 }) });
-  const input = { rentalType: "SUITE", buildingType: "TOWNHOUSE", hasElevator: false,
+  const input = { rentalType: "INDEPENDENT_SUITE", buildingType: "TOWNHOUSE", hasElevator: false,
     deposit: { mode: "MONTHS", months: 1.5 }, managementFee: { mode: "SEPARATE", amount: 500 },
-    occupancy: { mode: "DATE", date: "2026-12-01" }, minimumLeaseTerm: "兩週", equipment: { mode: "PRESENT", furniture: ["書桌"], appliances: [] },
+    occupancy: { mode: "DATE", date: "2026-12-01" }, minimumLeaseMonths: 1, equipment: { mode: "PRESENT", furniture: ["書桌"], appliances: [] },
     floor: { mode: "RANGE", from: -1, to: 1 }, totalFloors: 4, privateBathrooms: 1, balcony: { mode: "PRIVATE", count: 1 }, sharedSpaces: ["KITCHEN"] };
   try {
     const draft = await orm.listing.create({ data: { publisherId: "owner", areaType: "legacy-area-type" } });
@@ -264,18 +264,18 @@ test("mode constraints reject invalid values while incomplete drafts remain allo
 
 test("accepted numeric boundaries round trip unchanged and rejected precision never alters a draft", async () => {
   const orm = new PrismaClient({ adapter: new PrismaPg({ host: root, database: "postgres", user: "postgres", port: 5432 }) });
-  const section = { rentalType: "SUITE", buildingType: "TOWNHOUSE", hasElevator: false,
-    deposit: { mode: "MONTHS", months: 2 }, managementFee: { mode: "SEPARATE", amount: 2147483647 },
-    occupancy: { mode: "IMMEDIATE" }, minimumLeaseTerm: "兩週", equipment: { mode: "NONE" },
+  const section = { rentalType: "INDEPENDENT_SUITE", buildingType: "TOWNHOUSE", hasElevator: false,
+    deposit: { mode: "MONTHS", months: 2 }, managementFee: { mode: "SEPARATE", amount: 10000000 },
+    occupancy: { mode: "IMMEDIATE" }, minimumLeaseMonths: 1, equipment: { mode: "NONE" },
     floor: { mode: "SINGLE", level: -1 }, totalFloors: 4, privateBathrooms: 1, balcony: { mode: "NONE" } };
   try {
     const draft = await orm.listing.create({ data: { publisherId: "owner", title: "numeric regression" } });
-    for (const months of [0.0001, 1.2345, 99999999.9999]) {
+    for (const months of [0.01, 1.25, 100]) {
       const saved = await orm.listing.update({ where: { id: draft.id },
         data: publicationDetailsToStorage({ ...section, deposit: { mode: "MONTHS", months } }) });
       expect(saved.depositMonths?.toString()).toBe(String(months));
       expect(publicationDetailsFromStorage(saved)).toMatchObject({ complete: true, value: { deposit: { mode: "MONTHS", months } } });
-      expect(saved.managementFee).toBe(2147483647);
+      expect(saved.managementFee).toBe(10000000);
     }
     for (const area of ["0.0001", "99999999.9999"]) {
       const saved = await orm.listing.update({ where: { id: draft.id }, data: { areaPings: new Prisma.Decimal(area) } });

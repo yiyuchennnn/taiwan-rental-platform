@@ -36,6 +36,6 @@ export async function readDraftDetails(tx: Prisma.TransactionClient, listingId: 
     select: { kind: true, mode: true, amount: true, rate: true, unit: true, frequency: true, source: true, description: true, variableRate: true } });
   const equipmentItems = await tx.listingEquipmentItem.findMany({ where: { listingId }, orderBy: { code: "asc" }, select: { code: true, status: true } });
   const feeItems = await tx.listingFeeItem.findMany({ where: { listingId }, orderBy: { id: "asc" },
-    select: { kind: true, label: true, mode: true, amount: true, frequency: true, required: true, description: true } });
-  return { utilityCharges: utilities.map(item => ({ ...item, rate: item.rate === null ? null : Number(item.rate) })), equipmentItems, feeItems };
+    select: { kind: true, label: true, mode: true, amount: true, frequency: true, required: true, description: true, percentage: true, paymentTiming: true, payee: true } });
+  return { utilityCharges: utilities.map(item => ({ ...item, rate: item.rate === null ? null : Number(item.rate) })), equipmentItems, feeItems: feeItems.map(item => ({ ...item, percentage: item.percentage === null ? null : Number(item.percentage) })) };
 }

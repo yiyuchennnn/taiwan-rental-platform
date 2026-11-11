@@ -1,84 +1,71 @@
-import { describe, expect, test } from "vitest";
-import { Prisma } from "@prisma/client";
-import { residentialRentalTypes } from "../src/modules/listings/listing-options.js";
-import { checkConfirmedPublicationRules, type PublicationCandidate } from "../src/modules/listings/publication-check.js";
-
-function candidate(): PublicationCandidate {
-  return {
-    rentalType: "SUITE", areaPings: 8.5,
-    moderationStatus: "NONE", contactPhone: null, contactEmail: "contact@example.test", contactLine: null,
-    waterBilling: "INCLUDED", electricityBilling: "BY_BILL", gasBilling: "NOT_PROVIDED", internetBilling: "SEPARATE",
-    media: Array.from({ length: 3 }, (_, index) => ({ isCover: index === 0,
-      asset: { displayUrl: "https://example.test/display", thumbnailUrl: "https://example.test/thumb", gpsRemovedAt: new Date() } })),
-  };
-}
-const codes = (value: PublicationCandidate) => checkConfirmedPublicationRules(value).issues.map(issue => issue.code);
-
-describe("confirmed publication rules (not publication authorization)", () => {
-  test.each(residentialRentalTypes)("accepts confirmed residential type $label", option => {
-    const value = candidate(); value.rentalType = option.value;
-    expect(checkConfirmedPublicationRules(value).confirmedRulesPassed).toBe(true);
-  });
-  test.each([null, "", "SHOP", "OFFICE", "FACTORY", "PARKING", "INDEPENDENT_SUITE", "PARTITIONED_SUITE"])("does not publish unsupported or legacy type %s without review", type => {
-    const value = candidate(); value.rentalType = type;
-    expect(codes(value)).toContain("RESIDENTIAL_RENTAL_TYPE_REQUIRED");
-  });
-  test.each([null, 0, -1, NaN, Infinity])("rejects missing or invalid area %s", area => {
-    const value = candidate(); value.areaPings = area;
-    expect(checkConfirmedPublicationRules(value).issues.some(issue => issue.path === "areaPings")).toBe(true);
-  });
-  test("accepts estimated fractional pings and Prisma Decimal without area type or source", () => {
-    const value = candidate(); value.areaPings = new Prisma.Decimal("8.125");
-    expect(checkConfirmedPublicationRules(value).confirmedRulesPassed).toBe(true);
-  });
-  test.each([0.00001, 1.23456, 100000000, new Prisma.Decimal("99999999.99991")])("does not silently round or overflow area %s", area => {
-    const value = candidate(); value.areaPings = area;
-    expect(codes(value)).toContain("AREA_EXCEEDS_STORAGE_PRECISION");
-  });
-  test.each([0.0001, new Prisma.Decimal("99999999.9999")])("accepts exact area storage boundary %s", area => {
-    const value = candidate(); value.areaPings = area;
-    expect(checkConfirmedPublicationRules(value).confirmedRulesPassed).toBe(true);
-  });
-  test.each([3, 30])("accepts the confirmed photo boundary %i and keeps outstanding checks", count => {
-    const value = candidate();
-    value.media = Array.from({ length: count }, (_, index) => ({ ...value.media[0]!, isCover: index === 0 }));
-    const result = checkConfirmedPublicationRules(value);
-    expect(result.confirmedRulesPassed).toBe(true);
-    expect(result.outstandingChecks).toContain("CURRENT_STATE_AND_ATOMIC_PUBLIC_QUOTA");
-    expect(result).not.toHaveProperty("canPublish");
-  });
-  test.each([0, 2, 31])("rejects %i photos", count => {
-    const value = candidate(); value.media = Array.from({ length: count }, () => value.media[0]!);
-    expect(codes(value)).toContain("PHOTO_COUNT_OUT_OF_RANGE");
-  });
-  test.each([0, 2])("rejects %i covers", count => {
-    const value = candidate(); value.media = value.media.map((photo, index) => ({ ...photo, isCover: index < count }));
-    expect(codes(value)).toContain("EXACTLY_ONE_COVER_REQUIRED");
-  });
-  test.each(["SUSPENDED", "BLOCKED"] as const)("preserves platform restriction %s", state => {
-    const value = candidate(); value.moderationStatus = state;
-    expect(codes(value)).toContain("PLATFORM_RESTRICTED");
-  });
-  test("blank contact channels do not count as contact information", () => {
-    const value = candidate(); value.contactEmail = " \n ";
-    expect(codes(value)).toContain("CONTACT_CHANNEL_REQUIRED");
-    value.contactLine = "rental-contact";
-    expect(codes(value)).not.toContain("CONTACT_CHANNEL_REQUIRED");
-  });
-  test("does not infer missing billing methods", () => {
-    const value = candidate(); value.waterBilling = null; value.gasBilling = null;
-    expect(checkConfirmedPublicationRules(value).issues.filter(issue => issue.code === "BILLING_METHOD_REQUIRED").map(issue => issue.path))
-      .toEqual(["waterBilling", "gasBilling"]);
-  });
-  test("legacy URLs and unprocessed assets cannot prove image readiness", () => {
-    const value = candidate();
-    value.media = [{ isCover: true, asset: null }, { isCover: false, asset: { ...value.media[0]!.asset!, gpsRemovedAt: null } }, value.media[2]!];
-    expect(checkConfirmedPublicationRules(value).issues.filter(issue => issue.code === "PHOTO_PROCESSING_UNCONFIRMED").map(issue => issue.path))
-      .toEqual(["media.0.asset", "media.1.asset"]);
-  });
-  test("does not mutate the candidate or expose private contact values in the report", () => {
-    const value = candidate(); const before = structuredClone(value);
-    expect(JSON.stringify(checkConfirmedPublicationRules(value))).not.toContain(value.contactEmail);
-    expect(value).toEqual(before);
-  });
+import { expect, test } from 'vitest';
+import { checkConfirmedPublicationRules } from '../src/modules/listings/publication-check.js';
+import { equipmentCodes } from '../src/modules/listings/input-rules.js';
+import { residentialRentalTypes, residentialBuildingTypes } from '../src/modules/listings/listing-options.js';
+const candidate = () => ({
+  title:'住宅', description:'完整租屋條件', rentalType:'INDEPENDENT_SUITE', buildingType:'TOWNHOUSE', areaPings:8.5, areaSource:'INTERIOR',
+  address:{cityCode:'66',districtCode:'01',addressLine:'測試路1號',roomNumber:'A室',roomIdentifierSource:'CUSTOM',addressKind:'STANDARD'},
+  totalFloors:4, floorMode:'SINGLE', floorFrom:2, bathrooms:1, sharedSpaces:[], rent:20000,
+  depositMode:'MONTHS',depositMonths:2,elevatorStatus:'UNKNOWN',petPolicy:'NOT_ALLOWED',cookingPolicy:'DISCUSS',
+  laundryStatus:'SHARED',dryingStatus:'NONE',garbageStatus:'SELF',subsidyPolicy:'UNKNOWN',minimumLeaseMonths:1,occupancyMode:'NEGOTIABLE',
+  publisherType:'LANDLORD',contactName:'陳先生',contactPhone:'0912345678',contactEmail:null,contactLine:null,
+  carParkingStatus:'NO',motorcycleParkingStatus:'UNKNOWN',moderationStatus:'NONE',
+  equipmentItems:equipmentCodes.map(code=>({code,status:'UNKNOWN'})),
+  utilityCharges:['WATER','ELECTRICITY','GAS','INTERNET'].map(kind=>({kind,mode:'INCLUDED'})),
+  feeItems:[{kind:'MANAGEMENT',label:'管理費',mode:'NONE',required:true}],
+  media:Array.from({length:3},(_,i)=>({isCover:i===0,asset:{displayUrl:'private/display',thumbnailUrl:'private/thumb',gpsRemovedAt:new Date()}})),
+});
+const codes = (v: Record<string,unknown>) => checkConfirmedPublicationRules(v).issues.map(i=>i.code);
+test('complete local fields never authorize publishing or verify external evidence',()=>{
+  const v=candidate(),before=structuredClone(v),result=checkConfirmedPublicationRules(v);
+  expect(result.confirmedRulesPassed).toBe(true);
+  expect(result.outstandingChecks).toContain('CONTACT_CONTROL_VERIFICATION');
+  expect(result).not.toHaveProperty('canPublish');
+  expect(JSON.stringify(result)).not.toContain('0912345678');
+  expect(v).toEqual(before);
+});
+test.each(residentialRentalTypes)('current rental type $value has its required layout',({value})=>{
+ const v={...candidate(),rentalType:value};
+ if(value==='ENTIRE_HOME'||value==='ENTIRE_BUILDING')Object.assign(v,{bedrooms:0,livingRooms:0,bathrooms:1,balconies:0});
+ if(value==='ENTIRE_BUILDING')Object.assign(v,{floorMode:'ENTIRE_BUILDING',floorFrom:null});
+ if(value==='ROOM')Object.assign(v,{bathrooms:0,sharedSpaces:['BATHROOM']});
+ expect(checkConfirmedPublicationRules(v).confirmedRulesPassed).toBe(true);
+});
+test.each(residentialBuildingTypes)('current building type $value does not imply elevator',({value})=>{
+ expect(checkConfirmedPublicationRules({...candidate(),buildingType:value,buildingDescription:'其他住宅'}).confirmedRulesPassed).toBe(true);
+});
+test.each(['SUITE','ENTIRE_FLOOR','SHOP','PARKING'])('legacy/unsupported %s requires correction',rentalType=>{
+ expect(codes({...candidate(),rentalType})).toContain('INVALID_FIELD');
+});
+test.each([0,.001,8.125,10000.01,NaN,Infinity])('rejects area %s',areaPings=>expect(codes({...candidate(),areaPings})).toContain('INVALID_FIELD'));
+test.each([.01,10000])('accepts area boundary %s',areaPings=>expect(checkConfirmedPublicationRules({...candidate(),areaPings}).confirmedRulesPassed).toBe(true));
+test('email alone never satisfies phone/LINE and invalid URL is not LINE',()=>{
+ expect(codes({...candidate(),contactPhone:null,contactEmail:'x@example.test'})).toContain('CONTACT_CHANNEL_REQUIRED');
+ expect(codes({...candidate(),contactPhone:null,contactLine:'https://evil.test/'})).toContain('INVALID_FIELD');
+ expect(checkConfirmedPublicationRules({...candidate(),contactPhone:null,contactLine:'https://lin.ee/abc123'}).confirmedRulesPassed).toBe(true);
+});
+test('missing area source, equipment, issuer company and fee details are explicit',()=>{
+ const r=checkConfirmedPublicationRules({...candidate(),areaSource:null,equipmentItems:[],publisherType:'AGENT',feeItems:[{kind:'MANAGEMENT',label:'管理費',mode:'FIXED',required:true}]});
+ expect(r.issues.map(i=>i.path)).toEqual(expect.arrayContaining(['areaSource','equipmentItems.BED','companyName','feeItems.0']));
+ expect(r.feeSummary).toBeNull();
+});
+test('seasonal rates need description instead of a fabricated single rate',()=>{
+ const v=candidate(); const utilities=v.utilityCharges.filter(u=>u.kind!=='ELECTRICITY');
+ const electric={kind:'ELECTRICITY',mode:'METERED',variableRate:true,description:'夏季每度6元，非夏季每度5元'};
+ expect(checkConfirmedPublicationRules({...v,utilityCharges:[...utilities,electric]}).confirmedRulesPassed).toBe(true);
+ expect(codes({...v,utilityCharges:[...utilities,{...electric,description:null}]})).toContain('METERED_DETAILS_REQUIRED');
+});
+test('basement and nonconsecutive floors allowed; too-high and empty multiple floors rejected',()=>{
+ expect(checkConfirmedPublicationRules({...candidate(),floorMode:'MULTIPLE',floorFrom:null,floors:[-1,2,4]}).confirmedRulesPassed).toBe(true);
+ expect(codes({...candidate(),floorMode:'MULTIPLE',floors:[5]})).toContain('FLOOR_EXCEEDS_TOTAL');
+ expect(codes({...candidate(),floorMode:'MULTIPLE',floors:[]})).toContain('FLOOR_REQUIRED');
+});
+test.each([0,2,31])('rejects %i photos',n=>expect(codes({...candidate(),media:Array.from({length:n},()=>candidate().media[0])})).toContain('PHOTO_COUNT_OUT_OF_RANGE'));
+test('platform restrictions and unprocessed assets block local checks',()=>{
+ expect(codes({...candidate(),moderationStatus:'BLOCKED'})).toContain('PLATFORM_RESTRICTED');
+ expect(codes({...candidate(),media:[{isCover:true,asset:null},...candidate().media.slice(1)]})).toContain('PHOTO_PROCESSING_UNCONFIRMED');
+});
+test('parking status, mandatory fee and optional choice cannot contradict',()=>{
+ expect(codes({...candidate(),carParkingStatus:'YES'})).toContain('PARKING_DETAILS_REQUIRED');
+ expect(codes({...candidate(),feeItems:[...candidate().feeItems,{kind:'CAR_PARKING',label:'車位',mode:'FIXED',amount:2000,frequency:'MONTHLY',required:true}]})).toContain('PARKING_FEE_CONFLICT');
 });

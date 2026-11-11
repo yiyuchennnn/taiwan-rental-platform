@@ -22,6 +22,10 @@ export function createDraftRouter(db: PrismaClient, policy: DraftCreationPolicy 
     const draft = await service.create(res.locals.auth as AuthenticatedSession, req.body);
     res.status(201).json({ data: { draft } });
   }));
+  router.get("/:id/validation", endpoint(async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ data: { validation: await service.validation(res.locals.auth as AuthenticatedSession, req.params.id as string) } });
+  }));
   router.get("/:id", endpoint(async (req, res) => {
     const draft = await service.read(res.locals.auth as AuthenticatedSession, req.params.id as string);
     res.json({ data: { draft } });

@@ -609,3 +609,46 @@ test("new detail collections cannot be silently overwritten via legacy aggregate
   const read = await request(app).get(`/api/v1/drafts/${id}`).set("Authorization", `Bearer ${token}`).expect(200);
   expect(read.body.data.draft).toMatchObject({ equipmentItems: [{ code: "BED", status: "YES" }], utilityCharges: [{ kind: "WATER", mode: "BY_BILL" }], feeItems: [{ amount: 1000 }] });
 });
+
+test('R03 service percentage and payment details round trip without touching other child data', async () => {
+  const { token } = await readyDraftIdentity();
+  const payload = { rent: 20001, contactPhone: '0912345678', feeItems: [
+    { kind: 'MANAGEMENT', label: '管理費', mode: 'NONE', required: true },
+    { kind: 'SERVICE', label: '服務費', mode: 'PERCENT', percentage: 12.25, frequency: 'ONCE', required: true, paymentTiming: '簽約時', payee: '房仲公司' },
+  ] };
+  const result = await request(app).post('/api/v1/drafts').set('Authorization', `Bearer ${token}`).send(payload).expect(201);
+  const id = result.body.data.draft.id;
+  expect(result.body.data.draft).toMatchObject({ rent: payload.rent, contactPhone: payload.contactPhone, feeItems: expect.arrayContaining(payload.feeItems.map(item => expect.objectContaining(item))) });
+  const before = await orm.listingFeeItem.findMany({ where: { listingId: id }, orderBy: { id: 'asc' } });
+  await request(app).patch(`/api/v1/drafts/${id}`).set('Authorization', `Bearer ${token}`).send({
+    title: '不應保存', feeItems: [{ ...payload.feeItems[1], percentage: 100.01 }],
+  }).expect(400);
+  expect(await orm.listingFeeItem.findMany({ where: { listingId: id }, orderBy: { id: 'asc' } })).toEqual(before);
+  expect((await orm.listing.findUniqueOrThrow({ where: { id } })).title).toBeNull();
+  await request(app).patch(`/api/v1/drafts/${id}`).set('Authorization', `Bearer ${token}`).send({ description: '只改說明' }).expect(200);
+  const read = await request(app).get(`/api/v1/drafts/${id}`).set('Authorization', `Bearer ${token}`).expect(200);
+  expect(read.body.data.draft).toMatchObject({ rent: payload.rent, contactPhone: payload.contactPhone, description: '只改說明', feeItems: expect.arrayContaining(payload.feeItems.map(item => expect.objectContaining(item))) });
+});
+
+test('read-only validation is owner-only, no-store, never publishes or changes timestamps', async () => {
+  const { token, user } = await readyDraftIdentity();
+  const row = await orm.listing.create({ data: { publisherId: user.id, rent: 20000, contactEmail: 'only@example.test' } });
+  const url = `/api/v1/drafts/${row.id}/validation`;
+  await request(app).get(url).expect(401);
+  await request(app).get(url).set('Authorization', `Bearer ${otherToken}`).expect(404);
+  const result = await request(app).get(url).set('Authorization', `Bearer ${token}`).expect(200);
+  expect(result.headers['cache-control']).toBe('no-store');
+  expect(result.body.data.validation.confirmedRulesPassed).toBe(false);
+  expect(result.body.data.validation.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'CONTACT_CHANNEL_REQUIRED' })]));
+  expect(result.body.data.validation.outstandingChecks).toContain('CURRENT_STATE_AND_ATOMIC_PUBLIC_QUOTA');
+  expect(JSON.stringify(result.body)).not.toContain('only@example.test');
+  expect(await orm.listing.findUniqueOrThrow({ where: { id: row.id } })).toEqual(row);
+});
+
+test.each([{contactPhone:'https://example.test'}, {contactLine:'https://line.me.evil.test/a'}, {contactEmail:'bad'},
+  {waterFeeDescription:'<script>alert(1)</script>'}])('draft rejects malformed filled contact or markup atomically: %j', async payload => {
+  const { token, user } = await readyDraftIdentity();
+  const before = await orm.listing.count({ where: { publisherId: user.id } });
+  await request(app).post('/api/v1/drafts').set('Authorization', `Bearer ${token}`).send(payload).expect(400);
+  expect(await orm.listing.count({ where: { publisherId: user.id } })).toBe(before);
+});

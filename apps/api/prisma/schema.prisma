@@ -432,6 +432,9 @@ model ListingEquipmentItem {
   @@id([listingId,code])
 }
 model ListingFeeItem {
+  percentage Decimal? @db.Decimal(5,2)
+  paymentTiming String?
+  payee String?
   id String @id @default(uuid())
   listingId String
   listing Listing @relation(fields:[listingId], references:[id], onDelete:Cascade)
