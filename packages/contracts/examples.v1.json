@@ -1,0 +1,80 @@
+{
+  "version": "2026-11-12",
+  "fixtureOnly": true,
+  "operation": {
+    "data": {
+      "operation": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "type": "CREATE_LISTING",
+        "state": "COMPLETED",
+        "resourceId": "00000000-0000-4000-8000-000000000002",
+        "currentRevision": 1,
+        "resultStatus": "DRAFT",
+        "safeNextAction": "RELOAD_CONTENT"
+      }
+    }
+  },
+  "scenarios": {
+    "FIELD_ERROR": {
+      "status": 400,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "請修正欄位",
+        "details": [
+          {
+            "path": "patch.rent",
+            "reason": "too_small"
+          }
+        ]
+      }
+    },
+    "UNAUTHENTICATED": {
+      "status": 401,
+      "error": {
+        "code": "UNAUTHENTICATED",
+        "message": "請先登入"
+      }
+    },
+    "NOT_FOUND": {
+      "status": 404,
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "找不到房源"
+      }
+    },
+    "REVISION_CONFLICT": {
+      "status": 409,
+      "error": {
+        "code": "REVISION_CONFLICT",
+        "message": "內容已更新，請重新載入並保留本地未送文字"
+      }
+    },
+    "QUOTA_FULL": {
+      "status": 409,
+      "error": {
+        "code": "CONTENT_QUOTA_EXCEEDED",
+        "message": "目標狀態額度已滿"
+      }
+    },
+    "KEY_REUSED": {
+      "status": 409,
+      "error": {
+        "code": "IDEMPOTENCY_KEY_REUSED",
+        "message": "此操作識別碼已用於不同內容"
+      }
+    },
+    "EVIDENCE_UNAVAILABLE": {
+      "status": 503,
+      "error": {
+        "code": "PUBLICATION_EVIDENCE_UNAVAILABLE",
+        "message": "正式發布服務尚未接妥"
+      }
+    }
+  },
+  "frontendActions": {
+    "REVISION_CONFLICT": "Preserve local text, reload current revision, show differences, reconfirm with a new key.",
+    "IDEMPOTENCY_KEY_REUSED": "Do not replace the payload under the same key.",
+    "NETWORK_UNKNOWN": "Query own operation if its id is known, otherwise resend the original key and identical body.",
+    "PUBLICATION_EVIDENCE_UNAVAILABLE": "Keep the draft. Never mark published or ask for another payment."
+  }
+}

@@ -158,7 +158,7 @@ test("all migrated scalar columns agree with generated Prisma model types and nu
   // Runtime DMMF omits isRequired/isList in this Prisma version. Read those
   // attributes from the schema and compare against the actual migrated DB.
   const schema = readFileSync(fileURLToPath(new URL("../prisma/schema.prisma", import.meta.url)), "utf8");
-  const types: Record<string, string> = { String: "text", Int: "integer", Boolean: "boolean", DateTime: "timestamp without time zone", Decimal: "numeric", BigInt: "bigint" };
+  const types: Record<string, string> = { String: "text", Int: "integer", Boolean: "boolean", DateTime: "timestamp without time zone", Decimal: "numeric", BigInt: "bigint", Json: "jsonb" };
   for (const model of Prisma.dmmf.datamodel.models) {
     const block = schema.match(new RegExp(`model ${model.name} \{([\\s\\S]*?)\n\}`))?.[1];
     expect(block).toBeDefined();

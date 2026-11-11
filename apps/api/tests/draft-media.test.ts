@@ -75,8 +75,8 @@ beforeAll(async () => {
   auth = (await sessions.authenticate(token))!;
   png = await sharp({ create: { width: 24, height: 24, channels: 3, background: "blue" } }).png().toBuffer();
   app.use(express.json());
-  app.use("/drafts/:id/images", createDraftMediaRouter(orm, deps));
-  app.use("/disabled/:id/images", createDraftMediaRouter(orm));
+  app.use("/drafts/:id/images", createDraftMediaRouter(orm, deps, true));
+  app.use("/disabled/:id/images", createDraftMediaRouter(orm, undefined, true));
   app.use((( _error, _req, res, _next) => res.status(500).json({ error: "internal" })) as express.ErrorRequestHandler);
 }, 30000);
 afterAll(async () => { try { await orm?.$disconnect(); } finally {
@@ -216,10 +216,10 @@ test("actual application composition connects auth, draft creation and image rou
   await request(runtime).post("/api/v1/auth/register").send({ email, password }).expect(201);
   const login = await request(runtime).post("/api/v1/auth/login").send({ email, password }).expect(200);
   const bearer = `Bearer ${login.body.data.accessToken}`;
-  const created = await request(runtime).post("/api/v1/drafts").set("Authorization", bearer).send({ title: "整合草稿" }).expect(201);
-  const id = created.body.data.draft.id;
+  const created = await request(runtime).post("/api/v1/me/listings").set("Idempotency-Key",randomUUID()).set("Authorization", bearer).send({ draft: { title: "整合草稿" } }).expect(201);
+  const id = created.body.data.operation.resourceId;
   const result = await request(runtime).post(`/api/v1/drafts/${id}/images`).set("Authorization", bearer)
-    .set("Content-Type", "image/png").set("Idempotency-Key", randomUUID()).set("X-Image-Rights-Confirmed", "true").send(png).expect(201);
+    .set("If-Match", '"1"').set("Content-Type", "image/png").set("Idempotency-Key", randomUUID()).set("X-Image-Rights-Confirmed", "true").send(png).expect(201);
   await request(runtime).get(`/api/v1/drafts/${id}/images/${result.body.data.images[0].id}/thumbnail`).set("Authorization", bearer).expect(200);
   await request(runtime).post("/api/v1/auth/logout").set("Authorization", bearer).expect(204);
   await request(runtime).get(`/api/v1/drafts/${id}/images`).set("Authorization", bearer).expect(401);

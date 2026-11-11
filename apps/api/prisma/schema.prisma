@@ -39,6 +39,7 @@ enum ListingStatus {
   UNPUBLISHED
   ARCHIVED
   TRASHED
+  DELETED
 }
 
 // 02-06 已列出的四種計費方式；null 表示尚未填答。
@@ -177,6 +178,9 @@ model Property {
 
 model Listing {
   id String @id @default(uuid())
+  revision Int @default(1)
+  publicationHistory String @default("NEVER")
+  publicId String @unique @default(uuid())
 
   areaSource String?
   elevatorStatus String?
@@ -331,6 +335,7 @@ model ListingMedia {
 // ========================================
 
 model City {
+  publicationPolicy String @default("NOT_OPEN")
   code      String  @id
   name      String  @unique
   isEnabled Boolean @default(false)
@@ -446,4 +451,47 @@ model ListingFeeItem {
   required Boolean
   description String?
   @@index([listingId])
+}
+
+// Durable safe receipts: no content, addresses or contact snapshots in replay results.
+model ContentOperation {
+  id String @id @default(uuid())
+  ownerId String
+  type String
+  requestKey String
+  requestDigest String
+  listingId String
+  revision Int
+  resultStatus String
+  createdAt DateTime @default(now())
+  @@unique([ownerId,type,requestKey])
+  @@index([listingId])
+}
+model ListingPreview {
+  id String @id @default(uuid())
+  contextDigest String
+  ownerId String
+  listingId String
+  revision Int
+  createdAt DateTime @default(now())
+  @@index([listingId])
+}
+// Whitelisted public projection, never a serialized Listing ORM object.
+model ListingPublication {
+  listingId String @id
+  publicId String @unique
+  revision Int
+  snapshot Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model ContentEvent {
+  id String @id @default(uuid())
+  operationId String
+  listingId String
+  type String
+  revision Int
+  createdAt DateTime @default(now())
+  @@unique([operationId,type])
+  @@index([listingId,revision])
 }

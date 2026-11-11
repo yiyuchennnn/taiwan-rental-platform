@@ -27,7 +27,7 @@ export interface MediaDependencies {
 }
 export function createDraftMediaService(db: PrismaClient, deps: MediaDependencies) {
   if (!deps.namespace || !Number.isSafeInteger(deps.leaseMs) || deps.leaseMs <= 0) throw new Error("Invalid media dependencies");
-  async function owned(tx: Prisma.TransactionClient, auth: AuthenticatedSession, listingId: string) {
+  async function owned(tx: Prisma.TransactionClient, auth: AuthenticatedSession, listingId: string, expectedRevision?: number) {
     await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${auth.user.id} FOR UPDATE`;
     const session = await tx.authSession.findFirst({ where: { id: auth.sessionId, userId: auth.user.id, revokedAt: null,
       expiresAt: { gt: new Date() }, user: { isActive: true } } });
@@ -36,6 +36,7 @@ export function createDraftMediaService(db: PrismaClient, deps: MediaDependencie
     const listing = await tx.listing.findFirst({ where: { id: listingId, publisherId: auth.user.id } });
     if (!listing) throw new MediaError(404, "NOT_FOUND", "找不到草稿");
     if (listing.status !== "DRAFT") throw new MediaError(409, "DRAFT_REQUIRED", "僅可編輯草稿圖片");
+    if(expectedRevision!==undefined && listing.revision!==expectedRevision) throw new MediaError(409,"REVISION_CONFLICT","內容已更新，請重新載入");
   }
   const rows = (tx: Prisma.TransactionClient, listingId: string) => tx.listingMedia.findMany({ where: { listingId }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     select: { id: true, assetId: true, sortOrder: true, isCover: true, asset: { select: { displayBytes: true, thumbnailBytes: true } } } });
@@ -59,14 +60,25 @@ export function createDraftMediaService(db: PrismaClient, deps: MediaDependencie
     async list(auth: AuthenticatedSession, listingId: string) {
       return db.$transaction(async tx => { await owned(tx, auth, listingId); return dto(await rows(tx, listingId)); });
     },
-    async upload(auth: AuthenticatedSession, listingId: string, input: Buffer, rightsConfirmed: boolean, requestKey: string = randomUUID()) {
+    async upload(auth: AuthenticatedSession, listingId: string, input: Buffer, rightsConfirmed: boolean, requestKey: string = randomUUID(), expectedRevision?: number) {
       if (rightsConfirmed !== true) throw new MediaError(400, "IMAGE_RIGHTS_REQUIRED", "請確認你有權使用此圖片");
-      // Cheap authorization before decode; rechecked before reservation and attachment.
-      await db.$transaction(tx => owned(tx, auth, listingId));
-      if (!deps.authorizeCapacity) throw new MediaError(503, "IMAGE_CAPACITY_UNAVAILABLE", "圖片容量資格尚未接妥");
-      const image = await processImage(input, deps.options);
       if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(requestKey)) throw new MediaError(400, "INVALID_UPLOAD_KEY", "請提供有效的上傳識別碼");
       const inputDigest = createHash("sha256").update(input).digest("hex");
+      // Successful replay precedes version/capacity checks and expensive decoding.
+      const original = await db.$transaction(async tx => {
+        await owned(tx,auth,listingId);
+        const previous=await tx.mediaUpload.findUnique({where:{ownerId_requestKey:{ownerId:auth.user.id,requestKey}}});
+        if(previous){
+          if(previous.listingId!==listingId || previous.inputDigest!==inputDigest)throw new MediaError(409,"UPLOAD_KEY_CONFLICT","上傳識別碼已用於其他圖片");
+          if(previous.state==='ATTACHED')return dto(await rows(tx,listingId));
+          throw new MediaError(409,"UPLOAD_REQUIRES_REVIEW","此上傳處理中或已移除，請重新載入清單");
+        }
+        await owned(tx,auth,listingId,expectedRevision);
+        return null;
+      });
+      if(original)return original;
+      if (!deps.authorizeCapacity) throw new MediaError(503, "IMAGE_CAPACITY_UNAVAILABLE", "圖片容量資格尚未接妥");
+      const image = await processImage(input, deps.options);
       const id = randomUUID(), nonce = randomUUID();
       const replay = await db.$transaction(async tx => {
         await owned(tx, auth, listingId);
@@ -76,6 +88,7 @@ export function createDraftMediaService(db: PrismaClient, deps: MediaDependencie
           if (previous.state === "ATTACHED") return dto(await rows(tx, listingId));
           throw new MediaError(409, "UPLOAD_REQUIRES_REVIEW", "此上傳處理中或已移除，請重新載入圖片清單後再試");
         }
+        await owned(tx,auth,listingId,expectedRevision);
         const count = await tx.listingMedia.count({ where: { listingId } });
         const pending = await tx.mediaUpload.count({ where: { listingId, state: "PENDING" } });
         if (count + pending >= 30) throw new MediaError(409, "IMAGE_LIMIT_REACHED", "每筆刊登最多 30 張圖片");
@@ -91,7 +104,7 @@ export function createDraftMediaService(db: PrismaClient, deps: MediaDependencie
         await store.put(id, "display", image.display.data);
         await store.put(id, "thumbnail", image.thumbnail.data);
         return await db.$transaction(async tx => {
-          await owned(tx, auth, listingId);
+          await owned(tx, auth, listingId, expectedRevision);
           // Same lock order as recovery. Never attach a job already claimed for cleanup.
           await tx.$queryRaw`SELECT id FROM "MediaUpload" WHERE id = ${id} FOR UPDATE`;
           const job = await tx.mediaUpload.findUniqueOrThrow({ where: { id } });
@@ -106,6 +119,7 @@ export function createDraftMediaService(db: PrismaClient, deps: MediaDependencie
             displayBytes: BigInt(image.display.bytes), thumbnailBytes: BigInt(image.thumbnail.bytes), gpsRemovedAt: image.metadataStrippedAt } });
           await tx.listingMedia.create({ data: { listingId, assetId: id, url: `private:${id}/display`, sortOrder: (max._max.sortOrder ?? -1) + 1 } });
           await tx.mediaUpload.update({ where: { id }, data: { state: "ATTACHED" } });
+          await tx.listing.update({where:{id:listingId},data:{revision:{increment:1}}});
           return dto(await rows(tx, listingId));
         });
       } catch (error) {
@@ -116,29 +130,34 @@ export function createDraftMediaService(db: PrismaClient, deps: MediaDependencie
         throw new MediaError(503, "IMAGE_UPLOAD_FAILED", "圖片上傳未完成，請稍後再試");
       }
     },
-    async reorder(auth: AuthenticatedSession, listingId: string, ids: string[]) {
+    async reorder(auth: AuthenticatedSession, listingId: string, ids: string[], expectedRevision?: number) {
       return db.$transaction(async tx => {
-        await owned(tx, auth, listingId);
+        await owned(tx, auth, listingId, expectedRevision);
         const current = await rows(tx, listingId);
         if (new Set(ids).size !== ids.length || ids.length !== current.length || current.some(item => !ids.includes(item.id))) {
           throw new MediaError(409, "IMAGE_SET_CHANGED", "圖片清單已變更，請重新載入");
         }
+        if (current.every((item,index)=>item.id===ids[index])) return dto(current);
         for (const [sortOrder, id] of ids.entries()) await tx.listingMedia.update({ where: { id }, data: { sortOrder } });
+        await tx.listing.update({where:{id:listingId},data:{revision:{increment:1}}});
         return dto(await rows(tx, listingId));
       });
     },
-    async cover(auth: AuthenticatedSession, listingId: string, mediaId: string) {
+    async cover(auth: AuthenticatedSession, listingId: string, mediaId: string, expectedRevision?: number) {
       return db.$transaction(async tx => {
-        await owned(tx, auth, listingId);
-        if (!await tx.listingMedia.findFirst({ where: { id: mediaId, listingId } })) throw new MediaError(404, "NOT_FOUND", "找不到圖片");
+        await owned(tx, auth, listingId, expectedRevision);
+        const selected=await tx.listingMedia.findFirst({ where: { id: mediaId, listingId } });
+        if (!selected) throw new MediaError(404, "NOT_FOUND", "找不到圖片");
+        if(selected.isCover) return dto(await rows(tx,listingId));
         await tx.listingMedia.updateMany({ where: { listingId, isCover: true }, data: { isCover: false } });
         await tx.listingMedia.update({ where: { id: mediaId }, data: { isCover: true } });
+        await tx.listing.update({where:{id:listingId},data:{revision:{increment:1}}});
         return dto(await rows(tx, listingId));
       });
     },
-    async remove(auth: AuthenticatedSession, listingId: string, mediaId: string) {
+    async remove(auth: AuthenticatedSession, listingId: string, mediaId: string, expectedRevision?: number) {
       const result = await db.$transaction(async tx => {
-        await owned(tx, auth, listingId);
+        await owned(tx, auth, listingId, expectedRevision);
         const media = await tx.listingMedia.findFirst({ where: { id: mediaId, listingId } });
         if (!media) throw new MediaError(404, "NOT_FOUND", "找不到圖片");
         // Different accounts/listings can share an asset. Serialize the final
@@ -146,6 +165,7 @@ export function createDraftMediaService(db: PrismaClient, deps: MediaDependencie
         // and both leave the unreferenced asset behind.
         if (media.assetId) await tx.$queryRaw`SELECT id FROM "MediaAsset" WHERE id = ${media.assetId} FOR UPDATE`;
         await tx.listingMedia.delete({ where: { id: mediaId } });
+        await tx.listing.update({where:{id:listingId},data:{revision:{increment:1}}});
         let cleanupId: string | null = null;
         if (media.assetId && !await tx.listingMedia.count({ where: { assetId: media.assetId } })) {
           const job = await tx.mediaUpload.findUnique({ where: { id: media.assetId } });

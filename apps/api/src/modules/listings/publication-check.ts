@@ -31,6 +31,7 @@ export function checkConfirmedPublicationRules(candidate: PublicationCandidate, 
   if (['INDEPENDENT_SUITE','SHARED_SUITE','ROOM'].includes(v.rentalType ?? '') && (!v.address?.roomNumber || !v.address.roomIdentifierSource)) add('UNIT_IDENTIFIER_REQUIRED','address.roomNumber');
   if (v.rentalType === 'ENTIRE_BUILDING' ? v.floorMode !== 'ENTIRE_BUILDING' : v.floorMode === 'ENTIRE_BUILDING') add('FLOOR_MODE_CONFLICT','floorMode');
   if ((v.floorMode !== 'MULTIPLE' && v.floors?.length) || ((v.floorMode === 'MULTIPLE' || v.floorMode === 'ENTIRE_BUILDING') && (v.floorFrom != null || v.floorTo != null)) || (v.floorMode === 'SINGLE' && v.floorTo != null)) add('FLOOR_MODE_CONFLICT','floorMode');
+  if(v.floorMode==='RANGE') add('LEGACY_FLOOR_CONFIRMATION_REQUIRED','floorMode');
   const levels = v.floorMode === 'MULTIPLE' ? v.floors ?? [] : v.floorMode === 'RANGE' ? [v.floorFrom,v.floorTo] : v.floorMode === 'SINGLE' ? [v.floorFrom] : [];
   if (v.floorMode && v.floorMode !== 'ENTIRE_BUILDING' && (!levels.length || levels.some(n => n == null))) add('FLOOR_REQUIRED','floors');
   if (levels.some(n => n != null && v.totalFloors != null && n > v.totalFloors)) add('FLOOR_EXCEEDS_TOTAL','floors');
@@ -62,6 +63,7 @@ export function checkConfirmedPublicationRules(candidate: PublicationCandidate, 
     if (u.mode === 'METERED' && (u.variableRate ? !u.description : u.rate == null || !u.unit)) add('METERED_DETAILS_REQUIRED',`utilityCharges.${kind}`);
   }
   const fees = v.feeItems ?? [];
+  if(v.serviceFeeDescription && !fees.some(f=>f.kind==='SERVICE')) add('SERVICE_FEE_DETAILS_REQUIRED','feeItems');
   if (!fees.some(f => f.kind === 'MANAGEMENT')) add('MANAGEMENT_FEE_REQUIRED','feeItems');
   fees.forEach((f,index) => {
     const path = `feeItems.${index}`;
@@ -75,7 +77,7 @@ export function checkConfirmedPublicationRules(candidate: PublicationCandidate, 
   for (const prefix of ['car','motorcycle'] as const) {
     const status = v[`${prefix}ParkingStatus`], kind = prefix === 'car' ? 'CAR_PARKING' : 'MOTORCYCLE_PARKING';
     const f = fees.filter(item => item.kind === kind);
-    if (status === 'YES' && (!v[`${prefix}ParkingType`] || v[`${prefix}ParkingRequired`] == null || f.length !== 1)) add('PARKING_DETAILS_REQUIRED',`${prefix}ParkingStatus`);
+    if (status === 'YES' && (!['FLAT','MECHANICAL','OTHER'].includes(v[`${prefix}ParkingType`] ?? '') || v[`${prefix}ParkingRequired`] == null || f.length !== 1)) add('PARKING_DETAILS_REQUIRED',`${prefix}ParkingStatus`);
     if (f.some(item => status !== 'YES' || item.required !== v[`${prefix}ParkingRequired`])) add('PARKING_FEE_CONFLICT',`${prefix}ParkingStatus`);
   }
   const media = Array.isArray(candidate.media) ? candidate.media as Array<{isCover?: boolean; asset?: {displayUrl?: string; thumbnailUrl?: string; gpsRemovedAt?: unknown} | null}> : [];

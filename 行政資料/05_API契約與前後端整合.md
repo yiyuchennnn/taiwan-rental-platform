@@ -1,6 +1,8 @@
 # 05 API契約與前後端整合
 
-版本：2026-11-07詳細設計整合版。產品規則取01／02，資料取04、安全取06。**既有入口與規劃入口分開**；本輪未新增路由、OpenAPI或前端。具體未實作URL為契約命名規劃，實作前須以同一版OpenAPI／範例／Mock固化，不把下表當已有可用API。
+> 實作追蹤更新（2026-11-12）：本章下文保留11/07設計批次語境；最新內容命令、機器契約與13檔307項隔離測試見[本批紀錄](歷史紀錄/執行與交付/2026-11-12_後端主流程與契約驗證.md)。只涵蓋房源主流程的部分要求，正式查核／容量／完整生命週期及全平台仍未完成，未部署；不能把舊「本輪只寫企劃」當目前沒有程式，也不能把本批當本章全部驗收。
+
+版本：2026-11-07詳細設計整合版。產品規則取01／02，資料取04、安全取06。**既有入口與規劃入口分開**；11/12已新增內容命令與OpenAPI／範例／獨立Mock，尚無前端；正式證據來源保持未接妥。具體未實作URL為契約命名規劃，實作前須以同一版OpenAPI／範例／Mock固化，不把下表當已有可用API。
 
 ## 05-01 共通契約
 
@@ -17,7 +19,10 @@
 | --- | --- | --- |
 | POST /auth/register、/auth/login | Email密碼、新帳號可信免費起點；login回Bearer及到期 | Email／身分查核不因此完成；網站cookie邊界尚未做 |
 | GET /auth/me、POST /auth/logout | 查本人、撤銷session；logout204 | 裝置管理／其他session撤銷、重設、OAuth未做 |
-| POST /drafts、GET/PATCH /drafts/:id | 本人DRAFT、新欄位／私人地址／子集合，新增查草稿額度 | 完整發布、版本衝突及其他狀態未做 |
+| GET /drafts/:id及validation | 相容本人草稿讀取與本地缺漏 | 實際app的舊POST／PATCH已停用，改用/me/listings |
+| POST／GET /me/listings、GET /me/listings/:id、PATCH work-version | 版本、key、列表、私人資料與原子保存 | 公開工作版及完整帳戶生命週期未完成 |
+| POST preview／publish／transitions、GET /me/operations/:id | 預覽、發布／狀態交易及最少操作收據 | 正式發布來源未接妥，runtime回503 |
+| GET /listings/:publicId及受控圖片 | 白名單、版本與撤除門檻，僅行政區 | 非完整搜尋地圖／正式外部驗收 |
 | GET/POST /drafts/:id/images | 可注入圖片核心；POST原始binary、Idempotency-Key UUIDv4、X-Image-Rights-Confirmed:true | runtime缺可信容量來源且預設不啟用；不是正式公開上傳 |
 | PUT圖片/order、/:mediaId/cover、DELETE /:mediaId、GET /:mediaId/:variant | 排序／封面／移引用／私有display或thumbnail | 正式容量、換圖、公開存取與清理worker未完成 |
 | GET /health | 程序存活 | 不等於DB、外部能力與收費就緒 |
@@ -31,12 +36,12 @@
 - 電梯／汽機車位YES／NO／UNKNOWN；寵物／開伙ALLOWED／NOT_ALLOWED／DISCUSS；洗曬PRIVATE／SHARED／NONE／UNKNOWN；垃圾STAFF／CENTRAL／SELF／OTHER／UNKNOWN；租補ACCEPTED／NOT_ACCEPTED／UNKNOWN。
 - floors多層清單去重、樓層與totalFloors符合02；指定入住按台灣日期，舊日期在無關編輯保留；minimumLeaseMonths 1～120。
 - utilityCharges為四種kind不重複，模式INCLUDED／BY_BILL／METERED／FIXED／NOT_PROVIDED；季節不同只variableRate與說明，不造單一價。equipmentItems九種code及明確三態；feeItems表明種類、模式、整期金額、週期、必要或選配。
-- address的棟別／室號來源／地址種類為私人工作資料；非標準地址並未因此核准。聯絡、驗證、完整費用比例及完整發布仍需後續服務，不因草稿200就認定有效公開。
-- 新版集合與舊聚合不混寫；舊值可讀回待修正，不為HTTP往返自動回填新語意。新增加的比例費模型須單獨遷移與契約，現有feeItems不能冒充已支援全部R03。
+- address的棟別／室號來源／地址種類為私人工作資料；非標準地址並未因此核准。聯絡、驗證、費用比例已保存與計算；正式發布查核仍需後續服務，不因草稿200就認定有效公開。
+- 新版集合與舊聚合不混寫；舊值可讀回待修正，不為HTTP往返自動回填新語意。新增加的比例費模型須單獨遷移與契約，11/11已支援PERCENT、percentage、paymentTiming、payee與精確摘要；不代表完整發布或聯絡驗證已完成。
 
 ## 05-04 規劃中的業務入口
 
-下表均為**規劃**。私有前綴/me、操作前綴/operations、管理前綴/admin，避免與現有草稿混淆。
+下表為產品家族設計；11/12已實作的內容命令／詳情入口見05-02，其他家族仍是**規劃**。私有前綴/me、操作前綴/operations、管理前綴/admin，避免與現有草稿混淆。
 
 | 家族／命名規劃 | 請求／結果要點 |
 | --- | --- |
@@ -67,8 +72,8 @@
 規劃的操作回應：`data.operation`含id、type、state、currentRevision、safeNextAction；202只表示已受理可查，不表示付款／換圖／取消續扣完成。成功查回結果不得重建副作用，未就緒有可重試原因不叫客戶重付。
 
 - 高風險提交使用Idempotency-Key，同帳戶＋操作類型＋key唯一，保存請求摘要與已提交結果。同key不同body回409，同key相同body回原結果；未完則回原operation，不能新扣款。
-- 已有圖片操作的key、權利確認及digest沿用，不改為純client任意asset URL。一般目前草稿POST尚無完整冪等契約，後續要補而非假稱已支援。
-- 編輯以body.expectedRevision為本輪命令基準（If-Match相容條件見05-08），與操作key不同：key防同意圖重送，revision防舊版本覆寫。現有草稿同欄序列最後寫入仍需遷移至此；改契約先相容測試，不直接宣稱新前端可用。
+- 已有圖片操作的key、權利確認及digest沿用，不改為純client任意asset URL。新/me/listings建立命令已持久化key；舊無版本草稿寫入已在實際app停用。
+- 編輯以body.expectedRevision為本輪命令基準（If-Match相容條件見05-08），與操作key不同：key防同意圖重送，revision防舊版本覆寫。新工作保存採expectedRevision，圖片寫入採版本條件；已保留舊服務隔離回歸測試並在實際app停舊寫入，仍無前端UI。
 - 游標含排序鍵／規則版本而非可猜私有欄位；翻頁版本失效提示重整，不能默默改條件。搜尋每頁上限與匯入／上傳資源限制由09目標定義並實測。
 
 ## 05-06 整合交付
@@ -151,4 +156,8 @@ errors只列必要欄位與原因，不回顯密碼、完整電話、私有地�
 
 先將本章命令矩陣轉成同版機器契約，再做Mock及前端整合，不先讓兩邊各猜欄位。交付須逐命令有成功、欄位錯、越權、版本衝突、額度不足、來源未知、處理中及重送範例；不是每命令必有相同HTTP錯誤，但不適用須註明。
 
-具體OpenAPI檔、可執行validator與Mock屬後續實作產物，本輪完成其語意及驗收需求，不把未建立的檔案列已交付。
+11/12已交付現有內容流程OpenAPI、validator、範例及獨立Mock；其他家族與非同步操作狀態尚未全部交付，不能以此宣稱05整章完成。
+
+## 2026-11-12 現行介面補充（優先於上述未實作描述）
+
+已交付[OpenAPI／範例／Mock](../packages/contracts/README.md)與[整合手冊](../docs/api/後端主流程與前端整合.md)。/me/listings及內容預覽／發布／轉換／操作查詢已有交易核心；原POST／PATCH /drafts在實際app已停用，圖片寫入也需版本。服務費PERCENT與支付時點／收款對象已於11/11實作，後續不能再當不存在。公開詳情／圖片為受控白名單，不是完整搜尋／地圖。正式證據讀取器缺少，runtime publish仍503；其他未實作家族維持規劃，不將表內所有URL宣稱可用。

@@ -19,7 +19,7 @@ export const unavailableDraftPolicy: DraftCreationPolicy = async () => {
   throw new DraftError(503, "DRAFT_ENTITLEMENTS_UNAVAILABLE", "草稿新增資格尚未接妥，請稍後再試");
 };
 
-function dataForPatch(current: Listing | null, input: unknown): Prisma.ListingUncheckedUpdateInput {
+export function dataForPatch(current: Listing | null, input: unknown): Prisma.ListingUncheckedUpdateInput {
   const patch = draftPatchSchema.parse(input);
   const { address: _address, utilityCharges: _utilities, equipmentItems: _equipment, feeItems: _fees, ...scalars } = patch;
   const data: Prisma.ListingUncheckedUpdateInput = { ...scalars,
@@ -152,14 +152,14 @@ function dataForPatch(current: Listing | null, input: unknown): Prisma.ListingUn
   return data;
 }
 
-function draftDto(row: Listing) {
+export function draftDto(row: Listing) {
   const editable = Object.fromEntries(Object.keys(draftPatchSchema.shape).filter(key => key !== "address" && !childFields.some(field => field === key)).map(key => {
     const value = row[key as keyof Listing];
     return [key, value instanceof Date ? value.toISOString().slice(0, 10)
       : key === "areaPings" || key === "depositMonths" ? value === null ? null : Number(value) : value];
   }));
   // Keep legacy area semantics visible; never relabel old registered area as usable area.
-  return { id: row.id, status: row.status, moderationStatus: row.moderationStatus,
+  return { id: row.id, revision: row.revision, publicId: row.publicId, publicationHistory: row.publicationHistory, status: row.status, moderationStatus: row.moderationStatus,
     ...editable, areaType: row.areaType, createdAt: row.createdAt, updatedAt: row.updatedAt };
 }
 
@@ -206,7 +206,7 @@ export function createDraftService(db: PrismaClient, creationPolicy: DraftCreati
         if (Object.keys(patch).length === 1 && patch.address && Object.keys(patch.address).length === 0) return response(tx, row);
         await patchDraftAddress(tx, row, patch.address);
         await patchDraftDetails(tx, row.id, patch);
-        const result = await tx.listing.updateMany({ where: { id, publisherId: auth.user.id, status: "DRAFT" }, data });
+        const result = await tx.listing.updateMany({ where: { id, publisherId: auth.user.id, status: "DRAFT" }, data: { ...data, revision: { increment: 1 } } });
         if (result.count !== 1) throw new DraftError(409, "DRAFT_STATE_CONFLICT", "草稿狀態已變更");
         return response(tx, await tx.listing.findUniqueOrThrow({ where: { id } }));
       });
@@ -217,7 +217,7 @@ export function createDraftService(db: PrismaClient, creationPolicy: DraftCreati
         await authenticated(tx, auth);
         const policy = await creationPolicy(tx, auth.user.id);
         if (!Number.isSafeInteger(policy.draftLimit) || policy.draftLimit < 0) throw new DraftError(503, "DRAFT_ENTITLEMENTS_UNAVAILABLE", "草稿新增資格尚未接妥");
-        const drafts = await tx.listing.count({ where: { publisherId: auth.user.id, status: "DRAFT" } });
+        const drafts = await tx.listing.count({ where: { publisherId: auth.user.id, status: "DRAFT", moderationStatus: "NONE" } });
         if (drafts >= policy.draftLimit) throw new DraftError(409, "DRAFT_QUOTA_EXCEEDED", "草稿額度已滿，原有內容仍保留");
         const row = await tx.listing.create({ data: { ...data, publisherId: auth.user.id, status: "DRAFT" } as Prisma.ListingUncheckedCreateInput });
         const patch = draftPatchSchema.parse(input);

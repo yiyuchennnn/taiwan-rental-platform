@@ -6,7 +6,7 @@ import { createSessionService, sessionLifetimeSeconds } from "../auth/session.se
 import { createDraftService, DraftError, type DraftCreationPolicy } from "./draft.service.js";
 import { resolveDraftCreationPolicy } from "./draft-creation-policy.js";
 
-export function createDraftRouter(db: PrismaClient, policy: DraftCreationPolicy = resolveDraftCreationPolicy) {
+export function createDraftRouter(db: PrismaClient, policy: DraftCreationPolicy = resolveDraftCreationPolicy, legacyCompatibility = false) {
   const router = Router();
   const service = createDraftService(db, policy);
   router.use(requireAuth(createSessionService(db, sessionLifetimeSeconds())));
@@ -19,6 +19,7 @@ export function createDraftRouter(db: PrismaClient, policy: DraftCreationPolicy 
     }
   };
   router.post("/", endpoint(async (req, res) => {
+    if(!legacyCompatibility) throw new DraftError(400,"USE_VERSIONED_CONTENT_COMMAND","請改用 /api/v1/me/listings，並提供操作識別碼");
     const draft = await service.create(res.locals.auth as AuthenticatedSession, req.body);
     res.status(201).json({ data: { draft } });
   }));
@@ -31,6 +32,7 @@ export function createDraftRouter(db: PrismaClient, policy: DraftCreationPolicy 
     res.json({ data: { draft } });
   }));
   router.patch("/:id", endpoint(async (req, res) => {
+    if(!legacyCompatibility) throw new DraftError(400,"USE_VERSIONED_CONTENT_COMMAND","請改用 /api/v1/me/listings/:id/work-version，並提供版本及操作識別碼");
     const draft = await service.patch(res.locals.auth as AuthenticatedSession, req.params.id as string, req.body);
     res.json({ data: { draft } });
   }));

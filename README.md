@@ -49,3 +49,7 @@ repository目前有15個migration；隔離測試曾從空庫重建，常駐開�
 - `compare:images` 本機產生 Markdown／PNG／JSON，另附離線 HTML；聊天介面可能只顯示 HTML 原碼。優先讀 [中文比較表](docs/database/圖片比較可讀版.md)。合成樣本不代表真實房源照片或會員容量估算。
 
 尚未有正式 CORS 網域、限流、完整刊登資格、OAuth、前端、安全／效能／備份還原等上線驗收。版本交付依使用者指示直接提交並推送 GitHub main，不另建分支；環境發布不等於 GitHub 推送，本機 VS Code 仍需另行同步。
+
+## 後端介面交付（2026-11-12）
+
+[API契約／Mock](packages/contracts/README.md)、[前端整合手冊](docs/api/後端主流程與前端整合.md)、[目前進度](行政資料/進度與待辦/進度執行表.md)。新前端使用帶版本及操作key的 `/api/v1/me/listings`，實際app不再接受無版本POST／PATCH `/drafts`。本批不是全部後端或正式發布完成；供應商與查核來源仍保持阻擋。

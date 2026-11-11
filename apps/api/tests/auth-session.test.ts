@@ -54,11 +54,11 @@ beforeAll(async () => {
   ] });
   app.use(express.json());
   app.use("/api/v1/auth", createAuthRouter(orm, 3600));
-  app.use("/api/v1/drafts", createDraftRouter(orm));
+  app.use("/api/v1/drafts", createDraftRouter(orm, undefined, true));
   // Explicit test-only policy fixtures. Never wire these into the production app.
-  app.use("/test/drafts", createDraftRouter(orm, async () => ({ draftLimit: 1, archiveCreation: "ALLOWED" })));
-  app.use("/test/blocked-drafts", createDraftRouter(orm, async () => ({ draftLimit: -1 })));
-  app.use("/test/unresolved-drafts", createDraftRouter(orm, async () => ({ draftLimit: Number.NaN })));
+  app.use("/test/drafts", createDraftRouter(orm, async () => ({ draftLimit: 1, archiveCreation: "ALLOWED" }), true));
+  app.use("/test/blocked-drafts", createDraftRouter(orm, async () => ({ draftLimit: -1 }), true));
+  app.use("/test/unresolved-drafts", createDraftRouter(orm, async () => ({ draftLimit: Number.NaN }), true));
   // Test-only integration route exercises the actual middleware, not a shipped API.
   app.get("/test/listings/:id", requireAuth(createSessionService(orm, 3600)), requireListingOwner(orm), (_req, res) => res.json({ id: res.locals.listingId }));
   ownerId = (await request(app).post("/api/v1/auth/register").send({ email: "owner@example.test", password, role: "ADMIN" }).expect(201)).body.data.user.id;
